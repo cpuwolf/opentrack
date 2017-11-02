@@ -7,6 +7,7 @@
 
 #include "point_tracker.h"
 #include "compat/nan.hpp"
+#include "compat/math-imports.hpp"
 
 using namespace types;
 
@@ -32,12 +33,12 @@ static void set_row(mat33& m, int i, const vec3& v)
     m(i,2) = v[2];
 }
 
-PointModel::PointModel(settings_pt& s)
+PointModel::PointModel(const settings_pt& s)
 {
     set_model(s);
     // calculate u
     u = M01.cross(M02);
-    u /= norm(u);
+    u = cv::normalize(u);
 
     // calculate projection matrix on M01,M02 plane
     f s11 = M01.dot(M01);
@@ -46,7 +47,7 @@ PointModel::PointModel(settings_pt& s)
     P = 1/(s11*s22-s12*s12) * mat22(s22, -s12, -s12,  s11);
 }
 
-void PointModel::set_model(settings_pt& s)
+void PointModel::set_model(const settings_pt& s)
 {
     switch (s.active_model_panel)
     {
@@ -83,7 +84,7 @@ void PointModel::get_d_order(const vec2* points, unsigned* d_order, const vec2& 
 }
 
 
-PointTracker::PointTracker() : init_phase(true)
+PointTracker::PointTracker() : init_phase(true), prev_order_valid(false)
 {
 }
 
@@ -91,14 +92,14 @@ PointTracker::PointOrder PointTracker::find_correspondences_previous(const vec2*
                                                                      const PointModel& model,
                                                                      const CamInfo& info)
 {
-    f fx; info.get_focal_length(fx);
+    const double fx = info.get_focal_length();
     PointTracker::PointOrder p;
     p[0] = project(vec3(0,0,0), fx);
     p[1] = project(model.M01, fx);
     p[2] = project(model.M02, fx);
 
-    const int diagonal = int(std::sqrt(double(info.res_x*info.res_x + info.res_y*info.res_y)));
-    static constexpr int div = 100;
+    const int diagonal = int(std::sqrt(f(info.res_x*info.res_x + info.res_y*info.res_y)));
+    constexpr int div = 100;
     const int max_dist = diagonal / div; // 8 pixels for 640x480
 
     // set correspondences by minimum distance to projected model point
@@ -137,13 +138,74 @@ PointTracker::PointOrder PointTracker::find_correspondences_previous(const vec2*
     return p;
 }
 
+bool PointTracker::maybe_use_old_point_order(const PointOrder& order, const CamInfo& info)
+{
+    constexpr f std_width = 640, std_height = 480;
+
+    PointOrder scaled_order;
+
+    const f cx = std_width / info.res_x;
+    const f cy = std_height / info.res_y;
+
+    for (unsigned k = 0; k < 3; k++)
+    {
+        // note, the .y component is actually scaled by width
+        scaled_order[k][0] = std_width * cx * order[k][0];
+        scaled_order[k][1] = std_width * cy * order[k][1];
+    }
+
+    f sum = 0;
+
+    for (unsigned k = 0; k < 3; k++)
+    {
+        vec2 tmp = prev_scaled_order[k] - scaled_order[k];
+        sum += std::sqrt(tmp.dot(tmp));
+    }
+
+    // CAVEAT don't increase too much, it visibly loses precision
+    constexpr f max_dist = f(.13);
+
+    const bool validp = sum < max_dist;
+
+    prev_order_valid &= validp;
+
+    if (!prev_order_valid)
+    {
+        prev_order = order;
+        prev_scaled_order = scaled_order;
+    }
+
+#if 0
+    {
+        static Timer tt;
+        static int cnt1 = 0, cnt2 = 0;
+        if (tt.elapsed_ms() >= 1000)
+        {
+            tt.start();
+            if (cnt1 + cnt2)
+            {
+                qDebug() << "old-order" << ((cnt1 * 100) / f(cnt1 + cnt2)) << "nsamples" << (cnt1 + cnt2);
+                cnt1 = 0, cnt2 = 0;
+            }
+        }
+        if (validp)
+            cnt1++;
+        else
+            cnt2++;
+    }
+#endif
+
+    prev_order_valid = validp;
+
+    return validp;
+}
+
 void PointTracker::track(const std::vector<vec2>& points,
                          const PointModel& model,
                          const CamInfo& info,
                          int init_phase_timeout)
 {
-    f fx;
-    info.get_focal_length(fx);
+    const double fx = info.get_focal_length();
     PointOrder order;
 
     if (init_phase_timeout > 0 && t.elapsed_ms() > init_phase_timeout)
@@ -157,7 +219,8 @@ void PointTracker::track(const std::vector<vec2>& points,
     else
         order = find_correspondences_previous(points.data(), model, info);
 
-    if (POSIT(model, order, fx) != -1)
+    if (maybe_use_old_point_order(order, info) ||
+        POSIT(model, order, fx) != -1)
     {
         init_phase = false;
         t.start();
@@ -196,12 +259,12 @@ int PointTracker::POSIT(const PointModel& model, const PointOrder& order, f foca
 
     // The expected rotation used for resolving the ambiguity in POSIT:
     // In every iteration step the rotation closer to R_expected is taken
-    static const mat33 R_expected(mat33::eye());
+    static const mat33 R_expected(X_CM.R);
 
     // initial pose = last (predicted) pose
     vec3 k;
     get_row(R_expected, 2, k);
-    f Z0 = f(1000);
+    f Z0 = X_CM.t[2] < f(1e-4) ? f(1000) : X_CM.t[2];
 
     f old_epsilon_1 = 0;
     f old_epsilon_2 = 0;
@@ -215,13 +278,7 @@ int PointTracker::POSIT(const PointModel& model, const PointOrder& order, f foca
     mat33 R_1, R_2;
     mat33* R_current = &R_1;
 
-    static constexpr int max_iter = 100;
-
-    using std::sqrt;
-    using std::atan;
-    using std::cos;
-    using std::sin;
-    using std::fabs;
+    constexpr int max_iter = 100;
 
     int i=1;
     for (; i<max_iter; ++i)
@@ -349,3 +406,4 @@ vec2 PointTracker::project(const vec3& v_M, f focal_length, const Affine& X_CM)
     vec3 v_C = X_CM * v_M;
     return vec2(focal_length*v_C[0]/v_C[2], focal_length*v_C[1]/v_C[2]);
 }
+

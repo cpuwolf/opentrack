@@ -8,15 +8,21 @@
 #pragma once
 
 #include "export.hpp"
+
+#include "compat/util.hpp"
+
 #include <QMetaType>
 #include <QDataStream>
 #include <QDebug>
 
 namespace options
 {
-    class OPENTRACK_OPTIONS_EXPORT slider_value final
+    class OTR_OPTIONS_EXPORT slider_value final
     {
         double cur_, min_, max_;
+
+        template<typename t>
+        using arith_conversion_t = std::enable_if_t<std::is_arithmetic_v<std::decay_t<t>>, std::decay_t<t>>;
     public:
         slider_value(double cur, double min, double max);
 
@@ -25,6 +31,13 @@ namespace options
             min_(double(min)),
             max_(double(max))
         {}
+
+        template<typename t>
+        never_inline
+        explicit operator arith_conversion_t<t>() const
+        {
+            return t(cur_);
+        }
 
         slider_value(const slider_value& v);
         slider_value();
@@ -47,4 +60,3 @@ QDataStream& operator >> (QDataStream& in, options::slider_value& v);
 
 QT_END_NAMESPACE
 
-Q_DECLARE_METATYPE(options::slider_value)

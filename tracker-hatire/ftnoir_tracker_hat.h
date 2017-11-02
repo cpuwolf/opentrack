@@ -1,17 +1,17 @@
 #pragma once
 
 #include "thread.hpp"
-#include "api/plugin-support.hpp"
+#include "api/plugin-api.hpp"
 #include "ftnoir_tracker_hat_settings.h"
 #include "ftnoir_arduino_type.h"
 
+#include <atomic>
+
 #include <QObject>
-#include <QPalette>
-#include <QtGui>
 #include <QByteArray>
 #include <QMessageBox>
-#include <QtSerialPort/QSerialPort>
-#include <QtSerialPort/QSerialPortInfo>
+#include <QSerialPort>
+#include <QSerialPortInfo>
 #include <QSettings>
 
 class hatire : public QObject, public ITracker
@@ -41,7 +41,7 @@ private:
 
     int frame_cnt;
 
-    volatile int CptError;
+    std::atomic<int> CptError;
 
     static inline QByteArray to_latin1(const QString& str) { return str.toLatin1(); }
 };

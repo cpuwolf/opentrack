@@ -7,7 +7,8 @@
  */
 
 #pragma once
-#include <ctime>
+
+#include "export.hpp"
 
 #if defined (_WIN32)
 #   include <windows.h>
@@ -16,96 +17,51 @@
 #   include <mach/mach_time.h>
 #endif
 
-class Timer
+#include <ctime>
+
+#include "time.hpp"
+#include "util.hpp"
+
+class OTR_COMPAT_EXPORT Timer final
 {
-private:
     struct timespec state;
-    long long conv_nsecs(const struct timespec& cur) const
-    {
-        return (cur.tv_sec - state.tv_sec) * 1000000000LL + (cur.tv_nsec - state.tv_nsec);
-    }
-    long conv_usecs(const struct timespec& cur) const
-    {
-        return (cur.tv_sec - state.tv_sec) * 1000000LL + (cur.tv_nsec - state.tv_nsec) / 1000;
-    }
+    long long conv_nsecs(const struct timespec& cur) const;
+    static void otr_clock_gettime(struct timespec* ts);
 #ifdef _WIN32
-    static LARGE_INTEGER otr_get_clock_frequency()
-    {
-        LARGE_INTEGER freq = {};
-        (void) QueryPerformanceFrequency(&freq);
-        return freq;
-    }
-    static void otr_clock_gettime(struct timespec* ts)
-    {
-        static LARGE_INTEGER freq = otr_get_clock_frequency();
-
-        LARGE_INTEGER d;
-
-        (void) QueryPerformanceCounter(&d);
-
-        using ll = long long;
-        using ld = long double;
-        const long long part = ll(d.QuadPart / ld(freq.QuadPart) * 1000000000.L);
-        using t_s = decltype(ts->tv_sec);
-        using t_ns = decltype(ts->tv_nsec);
-
-        ts->tv_sec = t_s(part / 1000000000LL);
-        ts->tv_nsec = t_ns(part % 1000000000LL);
-    }
+    static LARGE_INTEGER otr_get_clock_frequency();
 #elif defined(__MACH__)
-    static mach_timebase_info_data_t otr_get_mach_frequency()
-    {
-        mach_timebase_info_data_t timebase_info;
-        (void) mach_timebase_info(&timebase_info);
-        return timebase_info;
-    }
-    static void otr_clock_gettime(struct timespec* ts)
-    {
-        static mach_timebase_info_data_t timebase_info = otr_get_mach_frequency();
-        uint64_t state, nsec;
-        state = mach_absolute_time();
-        nsec = state * timebase_info.numer / timebase_info.denom;
-        ts->tv_sec = nsec / 1000000000L;
-        ts->tv_nsec = nsec % 1000000000L;
-    }
+    static mach_timebase_info_data_t otr_get_mach_frequency();
 #endif
 
+    static void gettime(struct timespec* state);
+
+    using ns = time_units::ns;
 public:
-    Timer()
+    Timer();
+    void start();
+
+    template<typename t>
+    t elapsed() const
     {
-        start();
-    }
-    static inline void wrap_gettime(struct timespec* state)
-    {
-#if defined(_WIN32) || defined(__MACH__)
-        otr_clock_gettime(state);
-#else
-        (void) clock_gettime(CLOCK_MONOTONIC, state);
-#endif
+        using namespace time_units;
+        return time_cast<t>(ns(elapsed_nsecs()));
     }
 
-    void start()
+    template<typename t>
+    bool is_elapsed(const t& time_value)
     {
-        wrap_gettime(&state);
+        using namespace time_units;
+
+        if (unlikely(elapsed<ns>() >= time_value))
+        {
+            start();
+            return true;
+        }
+        return false;
     }
-    long long elapsed_nsecs() const
-    {
-        struct timespec cur = {};
-        wrap_gettime(&cur);
-        return conv_nsecs(cur);
-    }
-    long elapsed_usecs() const
-    {
-        struct timespec cur = {};
-        wrap_gettime(&cur);
-        return long(conv_usecs(cur));
-    }
-    long elapsed_ms() const
-    {
-        return elapsed_usecs() / 1000L;
-    }
-    double elapsed_seconds() const
-    {
-        return double(elapsed_nsecs() * 1e-9L);
-    }
+
+    long long elapsed_nsecs() const;
+    double elapsed_usecs() const;
+    double elapsed_ms() const;
+    double elapsed_seconds() const;
 };

@@ -32,6 +32,7 @@ For the latest releases visit: <<https://github.com/opentrack/opentrack/releases
 - Windows Phone [tracker](https://github.com/ZanderAdam/OpenTrack.WindowsPhone/wiki) over opentrack UDP protocol
 - Arduino with custom firmware
 - Intel RealSense 3D cameras (Windows)
+- BBC micro:bit, LEGO, sensortag support via [S2Bot](http://www.picaxe.com/Teaching/Other-Software/Scratch-Helper-Apps/)
 
 # Output
 
@@ -44,6 +45,7 @@ For the latest releases visit: <<https://github.com/opentrack/opentrack/releases
 - Tablet-like mouse output (Windows)
 - FlightGear
 - FSUIPC for Microsoft Flight Simulator 2002/2004 (Windows)
+- SteamVR through a bridge (Windows; see <<https://github.com/r57zone/OpenVR-OpenTrack>> by @r57zone)
 
 ***
 
@@ -64,6 +66,7 @@ Don't be afraid to submit an issue/feature request if need arises.
 - Xavier Hallade (Intel RealSense tracker author and maintainer)
 - furax49 (hatire tracker author)
 - Michael Welter (contributor)
+- Attila Csipa (Micro:Bit author)
 
 # Thanks
 

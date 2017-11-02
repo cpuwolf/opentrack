@@ -10,16 +10,25 @@
 
 #include "ftnoir_tracker_pt_settings.h"
 #include "camera.h"
-#include "numeric.hpp"
+#include "cv/numeric.hpp"
+
+#include <vector>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <vector>
-
-namespace impl {
+namespace pt_impl {
 
 using namespace types;
+
+struct blob
+{
+    f radius, brightness;
+    vec2 pos;
+    cv::Rect rect;
+
+    blob(f radius, const vec2& pos, f brightness, cv::Rect &rect);
+};
 
 class PointExtractor final
 {
@@ -30,6 +39,8 @@ public:
     PointExtractor();
 
     settings_pt s;
+
+    static double threshold_radius_value(int w, int h, int threshold);
 private:
     static constexpr int max_blobs = 16;
 
@@ -37,19 +48,21 @@ private:
     cv::Mat frame_bin;
     cv::Mat hist;
     cv::Mat frame_blobs;
-
-    struct blob
-    {
-        double radius, brightness;
-        vec2 pos;
-        cv::Rect rect;
-
-        blob(double radius, const cv::Vec2d& pos, double brightness, cv::Rect &rect);
-    };
-
     std::vector<blob> blobs;
+    cv::Mat ch[3], ch_float[4];
+
+    void ensure_channel_buffers(const cv::Mat& orig_frame);
+    void ensure_buffers(const cv::Mat& frame);
+
+    void extract_single_channel(const cv::Mat& orig_frame, int idx, cv::Mat& dest);
+    void extract_channels(const cv::Mat& orig_frame, const int* order, int order_npairs);
+    void extract_all_channels(const cv::Mat& orig_frame);
+    void channels_to_float(unsigned num_channels);
+
+    void color_to_grayscale(const cv::Mat& frame, cv::Mat& output);
+    void threshold_image(const cv::Mat& frame_gray, cv::Mat& output);
 };
 
 } // ns impl
 
-using impl::PointExtractor;
+using pt_impl::PointExtractor;

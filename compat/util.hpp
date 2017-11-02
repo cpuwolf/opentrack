@@ -1,71 +1,88 @@
 #pragma once
 
+#include "opentrack-library-path.h"
 #include "ndebug-guard.hpp"
-
-#include "make-unique.hpp"
 #include "run-in-thread.hpp"
+#include "meta.hpp"
+#include "functional.hpp"
+#include "macros.hpp"
+#include "value-templates.hpp"
 
+#include <type_traits>
 #include <memory>
 #include <cmath>
 #include <utility>
 
-#include <QSharedPointer>
+#include <iterator>
+
 #include <QDebug>
 
-#define progn(...) ([&]() { __VA_ARGS__ }())
-template<typename t> using mem = std::shared_ptr<t>;
-template<typename t> using ptr = std::unique_ptr<t>;
+#define progn(...) (([&]() { __VA_ARGS__ })())
+#define prog1(x, ...) (([&]() { auto _ret1324 = (x); do { __VA_ARGS__; } while (0); return _ret1324; })())
 
-#ifdef Q_CREATOR_RUN
-#   define DEFUN_WARN_UNUSED
-#elif defined(_MSC_VER)
-#   define DEFUN_WARN_UNUSED _Check_return_
-#else
-#   define DEFUN_WARN_UNUSED __attribute__((warn_unused_result))
-#endif
-
-#if defined(__GNUG__)
-#   define unused(t, i) t __attribute__((unused)) i
-#else
-#   define unused(t, i) t
-#endif
-
-#if !defined(_WIN32)
-#   define unused_on_unix(t, i) unused(t, i)
-#else
-#   define unused_on_unix(t, i) t i
-#endif
+#define once_only(...) do { static bool once = false; if (!once) { once = true; __VA_ARGS__; } } while(false)
 
 template<typename t>
-int iround(const t& val)
+inline int iround(const t& val)
 {
     return int(std::round(val));
+}
+
+template<typename t>
+inline unsigned uround(const t& val)
+{
+    return std::round(std::fmax(t(0), val));
 }
 
 namespace util_detail {
 
 template<typename n>
-inline auto clamp_(n val, n min, n max) -> n
+inline auto clamp_float(n val, n min, n max)
 {
-    if (val > max)
-        return max;
-    if (val < min)
-        return min;
-    return val;
+    return std::fmin(std::fmax(val, min), max);
 }
 
-}
+template<typename t, typename n>
+struct clamp final
+{
+    static inline auto clamp_(const n& val, const n& min, const n& max)
+    {
+        if (unlikely(val > max))
+            return max;
+        if (unlikely(val < min))
+            return min;
+        return val;
+    }
+};
+
+template<typename t>
+struct clamp<float, t>
+{
+    static inline auto clamp_(float val, float min, float max)
+    {
+        return clamp_float(val, min, max);
+    }
+};
+
+template<typename t>
+struct clamp<double, t>
+{
+    static inline auto clamp_(double val, double min, double max)
+    {
+        return clamp_float(val, min, max);
+    }
+};
+
+} // ns util_detail
 
 template<typename t, typename u, typename w>
-inline auto clamp(const t& val, const u& min, const w& max) -> decltype(val * min * max)
+inline auto clamp(const t& val, const u& min, const w& max)
 {
-    return ::util_detail::clamp_<decltype(val * min * max)>(val, min, max);
+    using tp = decltype(val + min + max);
+    return ::util_detail::clamp<std::decay_t<tp>, tp>::clamp_(val, min, max);
 }
 
-template<typename t, typename... xs>
-auto qptr(xs... args)
-{
-    return QSharedPointer<t>(new t(std::forward<xs>(args)...));
-}
+template<typename t>
+using cv_qualified = std::conditional_t<is_fundamental_v<std::decay_t<t>>, std::decay_t<t>, const t&>;
 
-template<typename t> using qshared = QSharedPointer<t>;
+

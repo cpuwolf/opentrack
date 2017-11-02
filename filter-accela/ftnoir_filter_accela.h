@@ -5,12 +5,14 @@
  * copyright notice and this permission notice appear in all copies.
  */
 #pragma once
+
+#include "ui_ftnoir_accela_filtercontrols.h"
+
 #include "accela-settings.hpp"
 #include "api/plugin-api.hpp"
 #include "compat/timer.hpp"
-#include "ui_ftnoir_accela_filtercontrols.h"
+#include "compat/variance.hpp"
 
-#include <atomic>
 #include <QMutex>
 #include <QTimer>
 
@@ -20,25 +22,21 @@ public:
     accela();
     void filter(const double* input, double *output) override;
     void center() override { first_run = true; }
-    spline rot, trans;
+    spline spline_rot, spline_pos;
 private:
     settings_accela s;
-    bool first_run;
-    double last_output[6];
-    double smoothed_input[6];
+    double last_output[6], deltas[6];
+    double smoothed_input[2];
     Timer t;
-#if 0
-    static double get_delta(double val, double prev);
+#if defined DEBUG_ACCELA
+    Timer debug_timer;
+    double debug_max;
+    variance var;
 #endif
-
-    template <typename T>
-    static inline int signum(T x)
-    {
-        return (T(0) < x) - (x < T(0));
-    }
+    bool first_run;
 };
 
-class dialog_accela: public IFilterDialog
+class dialog_accela : public IFilterDialog
 {
     Q_OBJECT
 public:
@@ -52,12 +50,6 @@ private:
 private slots:
     void doOK();
     void doCancel();
-    void update_ewma_display(const slider_value& value);
-    void update_rot_display(const slider_value& value);
-    void update_trans_display(const slider_value& value);
-    void update_rot_dz_display(const slider_value& value);
-    void update_trans_dz_display(const slider_value&);
-    void update_rot_nl_slider(const slider_value& sl);
 };
 
 class accelaDll : public Metadata

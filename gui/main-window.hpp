@@ -9,11 +9,11 @@
 #pragma once
 
 #include "api/plugin-support.hpp"
-#include "mapping-window.hpp"
-#include "options-dialog.hpp"
+#include "mapping-dialog.hpp"
+#include "settings.hpp"
 #include "process_detector.h"
 #include "logic/main-settings.hpp"
-#include "logic/tracker.h"
+#include "logic/pipeline.hpp"
 #include "logic/shortcuts.h"
 #include "logic/work.hpp"
 #include "logic/state.hpp"
@@ -49,17 +49,17 @@ class MainWindow : public QMainWindow, private State
 
     Shortcuts global_shortcuts;
     module_settings m;
-    ptr<QSystemTrayIcon> tray;
+    std::unique_ptr<QSystemTrayIcon> tray;
     QMenu tray_menu;
     QTimer pose_update_timer;
     QTimer det_timer;
     QTimer config_list_timer;
-    ptr<OptionsDialog> options_widget;
-    ptr<MapWidget> mapping_widget;
+    std::unique_ptr<OptionsDialog> options_widget;
+    std::unique_ptr<MapWidget> mapping_widget;
     QShortcut kbd_quit;
-    ptr<IFilterDialog> pFilterDialog;
-    ptr<IProtocolDialog> pProtocolDialog;
-    ptr<ITrackerDialog> pTrackerDialog;
+    std::unique_ptr<IFilterDialog> pFilterDialog;
+    std::unique_ptr<IProtocolDialog> pProtocolDialog;
+    std::unique_ptr<ITrackerDialog> pTrackerDialog;
 
     process_detector_worker det;
     QMenu profile_menu;
@@ -68,20 +68,20 @@ class MainWindow : public QMainWindow, private State
             menu_action_tracker, menu_action_filter, menu_action_proto,
             menu_action_options, menu_action_mappings;
 
-    mem<dylib> current_tracker()
+    std::shared_ptr<dylib> current_tracker()
     {
         return modules.trackers().value(ui.iconcomboTrackerSource->currentIndex(), nullptr);
     }
-    mem<dylib> current_protocol()
+    std::shared_ptr<dylib> current_protocol()
     {
         return modules.protocols().value(ui.iconcomboProtocol->currentIndex(), nullptr);
     }
-    mem<dylib> current_filter()
+    std::shared_ptr<dylib> current_filter()
     {
         return modules.filters().value(ui.iconcomboFilter->currentIndex(), nullptr);
     }
 
-    void updateButtonState(bool running, bool inertialp);
+    void update_button_state(bool running, bool inertialp);
     void display_pose(const double* mapped, const double* raw);
     void ensure_tray();
     void set_title(const QString& game_title = QStringLiteral(""));
@@ -95,31 +95,35 @@ class MainWindow : public QMainWindow, private State
 
     void changeEvent(QEvent* e) override;
     void closeEvent(QCloseEvent*) override;
+    bool event(QEvent *event) override;
     bool maybe_hide_to_tray(QEvent* e);
+#if !defined _WIN32 && !defined __APPLE__
+    void annoy_if_root();
+#endif
 
     // only use in impl file since no definition in header!
     template<typename t>
-    bool mk_dialog(mem<dylib> lib, ptr<t>& d);
+    bool mk_dialog(std::shared_ptr<dylib> lib, std::unique_ptr<t>& d);
 
     // idem
     template<typename t, typename... Args>
-    inline bool mk_window(ptr<t>& place, Args&&... params);
+    inline bool mk_window(std::unique_ptr<t>& place, Args&&... params);
 
     // idem
     template<typename t, typename F>
-    bool mk_window_common(ptr<t>& d, F&& ctor);
+    bool mk_window_common(std::unique_ptr<t>& d, F&& ctor);
 
 private slots:
     void save_modules();
     void exit();
     bool set_profile(const QString& new_name);
 
-    void showTrackerSettings();
-    void showProtocolSettings();
-    void showFilterSettings();
+    void show_tracker_settings();
+    void show_proto_settings();
+    void show_filter_settings();
     void show_options_dialog();
-    void showCurveConfiguration();
-    void showHeadPose();
+    void show_mapping_window();
+    void show_pose();
 
     void maybe_start_profile_from_executable();
 
@@ -128,16 +132,16 @@ private slots:
     void open_config_directory();
     bool refresh_config_list();
 
-    void startTracker();
-    void stopTracker();
+    void start_tracker_();
+    void stop_tracker_();
 
     void toggle_restore_from_tray(QSystemTrayIcon::ActivationReason e);
 
 signals:
-    void emit_start_tracker();
-    void emit_stop_tracker();
-    void emit_toggle_tracker();
-    void emit_restart_tracker();
+    void start_tracker();
+    void stop_tracker();
+    void toggle_tracker();
+    void restart_tracker();
 public:
     MainWindow();
     ~MainWindow();

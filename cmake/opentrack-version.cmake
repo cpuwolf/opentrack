@@ -2,7 +2,7 @@ include(GetGitRevisionDescription)
 
 find_package(Git QUIET)
 if(GIT_FOUND)
-    git_describe(OPENTRACK_COMMIT --tags --always --dirty)
+    git_describe(OPENTRACK_COMMIT --tags --always)
 endif()
 
 unset(_build_type)
@@ -29,17 +29,18 @@ const char* opentrack_version;
 const char* opentrack_version = \"${OPENTRACK_COMMIT}${_build_type}\";
 ")
 
+set(file "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
 set(crapola-ver)
-if(EXISTS ${CMAKE_BINARY_DIR}/version.c)
-    file(READ ${CMAKE_BINARY_DIR}/version.c crapola-ver)
+if(EXISTS "${file}")
+    file(READ "${file}" crapola-ver)
 endif()
 
 if(NOT (crapola-ver STREQUAL version-string))
-    file(WRITE ${CMAKE_BINARY_DIR}/version.c "${version-string}")
+    file(WRITE "${file}" "${version-string}")
 endif()
 
-add_library(opentrack-version STATIC ${CMAKE_BINARY_DIR}/version.c)
+add_library(opentrack-version STATIC "${file}")
+
 if(NOT MSVC)
-    set_property(TARGET opentrack-version APPEND_STRING PROPERTY COMPILE_FLAGS "-fno-lto")
+    otr_prop(TARGET opentrack-version COMPILE_FLAGS "-fno-lto")
 endif()
-opentrack_compat(opentrack-version)

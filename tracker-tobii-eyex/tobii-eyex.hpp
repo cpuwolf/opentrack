@@ -10,15 +10,16 @@
 
 #include "tobii-settings.hpp"
 
-#include <EyeX.h>
-
 #include "api/plugin-api.hpp"
 #include "options/options.hpp"
 using namespace options;
 #include "compat/timer.hpp"
 
+#include <EyeX.h>
+
 #include <functional>
 #include <atomic>
+
 #include <QObject>
 #include <QMutex>
 
@@ -52,9 +53,6 @@ private:
 
     num gain(num x);
 
-    settings s;
-    rel_settings rel_s;
-
     TX_CONTEXTHANDLE dev_ctx;
     TX_TICKET conn_state_changed_ticket;
     TX_TICKET event_handler_ticket;
@@ -62,7 +60,7 @@ private:
     TX_HANDLE display_state;
 
     QMutex global_state_mtx;
-
+    settings s;
     Timer t;
 
     struct state
@@ -77,7 +75,7 @@ private:
     } dev_state;
 
     double yaw, pitch;
-    volatile bool do_center;
+    std::atomic<bool> do_center;
 };
 
 class tobii_eyex_metadata : public Metadata

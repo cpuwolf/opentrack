@@ -21,24 +21,30 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 include(opentrack-check-build-directory)
-include(opentrack-build)
+include(opentrack-mrproper)
 
 project(opentrack)
 cmake_minimum_required(VERSION 2.8.11)
 include(opentrack-policy NO_POLICY_SCOPE)
+include(opentrack-load-user-settings)
 
 set_property(GLOBAL PROPERTY opentrack-all-modules "")
 set_property(GLOBAL PROPERTY opentrack-all-source-dirs "")
-set(opentrack-all-translations nl_NL ru_RU stub)
+set(opentrack_all-translations "" CACHE STRING "Leave empty for default")
+
+if(".${opentrack_all-translations}" STREQUAL ".")
+    set(opentrack_all-translations "nl_NL;ru_RU;stub")
+endif()
 
 include(opentrack-word-size)
 include(opentrack-hier)
-include(opentrack-qt)
 include(opentrack-platform)
+include(opentrack-i18n)
 include(opentrack-boilerplate)
 
+include(opentrack-qt)
 include(opentrack-version)
 include(opentrack-install)
 
@@ -46,35 +52,35 @@ if(WIN32)
     enable_language(RC)
 endif()
 
-add_custom_target(mrproper COMMAND ${CMAKE_COMMAND} -P "${CMAKE_SOURCE_DIR}/cmake/opentrack-clean-build-directory.cmake" WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+add_custom_target(mrproper COMMAND
+    "${CMAKE_COMMAND}" -P
+    "${CMAKE_SOURCE_DIR}/cmake/opentrack-clean-build-directory.cmake"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
 
-set(C CMakeLists.txt)
-file(GLOB opentrack-subprojects
-    "tracker-*/${C}"
-    "proto-*/${C}"
-    "filter-*/${C}"
-    "options/${C}"
-    "api/${C}"
-    "compat/${C}"
-    "logic/${C}"
-    "dinput/${C}"
-    "gui/${C}"
-    "x-plane-plugin/${C}"
-    "csv/${C}"
-    "pose-widget/${C}"
-    "spline-widget/${C}"
-    "qxt-mini/${C}"
-    "macosx/${C}"
-    "cv/${C}"
-    "migration/${C}"
-)
+otr_add_target_dirs(opentrack-subprojects
+    "tracker-*"
+    "proto-*"
+    "filter-*"
+    "ext-*"
+    "options"
+    "api"
+    "compat"
+    "logic"
+    "dinput"
+    "gui"
+    "x-plane-plugin"
+    "csv"
+    "pose-widget"
+    "spline"
+    "qxt-mini"
+    "macosx"
+    "cv"
+    "migration")
 
-list(SORT opentrack-subprojects)
-
-foreach(i ${opentrack-subprojects})
-    get_filename_component(i ${i} DIRECTORY)
-    add_subdirectory(${i})
+foreach(k ${opentrack-subprojects})
+    get_filename_component(k "${k}" DIRECTORY)
+    add_subdirectory("${k}")
 endforeach()
 
-merge_translations()
+otr_merge_translations()
 install_sources()

@@ -8,8 +8,11 @@
 
 #include "test.h"
 #include "api/plugin-api.hpp"
-#include <cmath>
+#include "compat/math-imports.hpp"
 
+#include <QPushButton>
+
+#include <cmath>
 #include <QDebug>
 
 const double test_tracker::incr[6] =
@@ -38,11 +41,6 @@ void test_tracker::start_tracker(QFrame*)
 
 void test_tracker::data(double *data)
 {
-    using std::fmod;
-    using std::sin;
-    using std::fabs;
-    using std::copysign;
-
     const double dt = t.elapsed_seconds();
     t.start();
 
@@ -78,6 +76,8 @@ void test_tracker::data(double *data)
 test_dialog::test_dialog()
 {
     ui.setupUi(this);
+
+    connect(ui.buttonBox->button(QDialogButtonBox::Abort), &QPushButton::clicked, []() { *(volatile int*)0 = 0; });
 
     connect(ui.buttonBox, SIGNAL(accepted()), this, SLOT(doOK()));
     connect(ui.buttonBox, SIGNAL(rejected()), this, SLOT(doCancel()));

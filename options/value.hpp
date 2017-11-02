@@ -8,197 +8,160 @@
 
 #pragma once
 
-#include "connector.hpp"
+#include "export.hpp"
+
+#include "compat/util.hpp"
 
 #include "bundle.hpp"
 #include "slider.hpp"
+#include "base-value.hpp"
+#include "value-traits.hpp"
+
+#include <cstdio>
 #include <type_traits>
 #include <typeinfo>
 #include <typeindex>
+#include <utility>
+
+#include <QVariant>
 #include <QString>
 #include <QPointF>
 #include <QList>
+#include <QMutex>
 
-#define OPENTRACK_DEFINE_SLOT(t) void setValue(t datum) { store(datum); }
-#define OPENTRACK_DEFINE_SIGNAL(t) void valueChanged(t) const
 namespace options {
-
-namespace detail {
-template<typename t> struct value_type_traits { using type = t;};
-template<> struct value_type_traits<QString> { using type = const QString&; };
-template<> struct value_type_traits<slider_value> { using type = const slider_value&; };
-template<typename u> struct value_type_traits<QList<u>>
-{
-    using type = const QList<u>&;
-};
-template<typename t> using value_type_t = typename value_type_traits<t>::type;
-}
-
-class OPENTRACK_OPTIONS_EXPORT base_value : public QObject
-{
-    Q_OBJECT
-    friend class ::options::detail::connector;
-
-    using comparator = bool(*)(const QVariant& val1, const QVariant& val2);
-public:
-    QString name() const { return self_name; }
-    base_value(bundle b, const QString& name, comparator cmp, std::type_index type_idx);
-    ~base_value() override;
-signals:
-    OPENTRACK_DEFINE_SIGNAL(double);
-    OPENTRACK_DEFINE_SIGNAL(float);
-    OPENTRACK_DEFINE_SIGNAL(int);
-    OPENTRACK_DEFINE_SIGNAL(bool);
-    OPENTRACK_DEFINE_SIGNAL(const QString&);
-    OPENTRACK_DEFINE_SIGNAL(const slider_value&);
-    OPENTRACK_DEFINE_SIGNAL(const QPointF&);
-
-    OPENTRACK_DEFINE_SIGNAL(const QList<double>&);
-    OPENTRACK_DEFINE_SIGNAL(const QList<float>&);
-    OPENTRACK_DEFINE_SIGNAL(const QList<int>&);
-    OPENTRACK_DEFINE_SIGNAL(const QList<bool>&);
-    OPENTRACK_DEFINE_SIGNAL(const QList<QString>&);
-    OPENTRACK_DEFINE_SIGNAL(const QList<slider_value>&);
-    OPENTRACK_DEFINE_SIGNAL(const QList<QPointF>&);
-protected:
-    bundle b;
-    QString self_name;
-    comparator cmp;
-    std::type_index type_index;
-
-    template<typename t>
-    void store(const t& datum)
-    {
-        b->store_kv(self_name, QVariant::fromValue(datum));
-    }
-
-public slots:
-    OPENTRACK_DEFINE_SLOT(double)
-    OPENTRACK_DEFINE_SLOT(int)
-    OPENTRACK_DEFINE_SLOT(bool)
-    OPENTRACK_DEFINE_SLOT(const QString&)
-    OPENTRACK_DEFINE_SLOT(const slider_value&)
-    OPENTRACK_DEFINE_SLOT(const QPointF&)
-
-    OPENTRACK_DEFINE_SLOT(const QList<double>&)
-    OPENTRACK_DEFINE_SLOT(const QList<float>&)
-    OPENTRACK_DEFINE_SLOT(const QList<int>&)
-    OPENTRACK_DEFINE_SLOT(const QList<bool>&)
-    OPENTRACK_DEFINE_SLOT(const QList<QString>&)
-    OPENTRACK_DEFINE_SLOT(const QList<slider_value>&)
-    OPENTRACK_DEFINE_SLOT(const QList<QPointF>&)
-
-    virtual void reload() = 0;
-    virtual void bundle_value_changed() const = 0;
-};
-
-namespace detail {
-template<typename t>
-struct value_get_traits
-{
-    static inline t get(const t& val, const t&)
-    {
-        return val;
-    }
-};
-
-template<>
-struct value_get_traits<slider_value>
-{
-    using t = slider_value;
-    static inline t get(const t& val, const t& def)
-    {
-        return t(val.cur(), def.min(), def.max());
-    }
-};
-
-template<typename t, typename Enable = void>
-struct value_element_type
-{
-    using type = typename std::remove_reference<typename std::remove_cv<t>::type>::type;
-};
-
-// Qt uses int a lot in slots so use it for all enums
-template<typename t>
-struct value_element_type<t, typename std::enable_if<std::is_enum<t>::value>::type>
-{
-    using type = int;
-};
-
-template<> struct value_element_type<float, void> { using type = double; };
-
-template<typename t> using value_element_type_t = typename value_element_type<t>::type;
-
-}
 
 template<typename t>
 class value final : public base_value
 {
-public:
-    using element_type = detail::value_element_type_t<t>;
+    using traits = detail::value_traits<t, t, void>;
+    using element_type = typename traits::element_type;
 
     static bool is_equal(const QVariant& val1, const QVariant& val2)
     {
         return val1.value<element_type>() == val2.value<element_type>();
     }
 
+    never_inline
+    t get() const
+    {
+        if (self_name.isEmpty())
+            return def;
+
+        if (!b->contains(self_name) || b->get<QVariant>(self_name).type() == QVariant::Invalid)
+            return def;
+
+        const element_type x(b->get<element_type>(self_name));
+
+        return traits::from_value(traits::from_storage(x), def);
+    }
+
+public:
+    never_inline
     t operator=(const t& datum)
     {
-        const element_type tmp = static_cast<element_type>(datum);
-        if (tmp != get())
-            store(tmp);
+        if (self_name.isEmpty())
+            return def;
+
+        if (datum != get())
+            store(traits::to_storage(datum));
+
         return datum;
     }
 
     static constexpr const Qt::ConnectionType DIRECT_CONNTYPE = Qt::DirectConnection;
     static constexpr const Qt::ConnectionType SAFE_CONNTYPE = Qt::QueuedConnection;
 
-    value(bundle b, const QString& name, t def) : base_value(b, name, &is_equal, std::type_index(typeid(element_type))), def(def)
+    never_inline
+    value(bundle b, const QString& name, t def) :
+        base_value(b, name, &is_equal, std::type_index(typeid(element_type))),
+        def(def)
     {
         QObject::connect(b.get(), SIGNAL(reloading()),
                          this, SLOT(reload()),
                          DIRECT_CONNTYPE);
-        if (!b->contains(name) || b->get<QVariant>(name).type() == QVariant::Invalid)
-            *this = def;
     }
 
+    never_inline
     value(bundle b, const char* name, t def) : value(b, QString(name), def)
     {
     }
 
+    never_inline
     t default_value() const
     {
         return def;
     }
 
-    operator t() const { return get(); }
-
-    void reload() override
+    never_inline
+    void set_to_default() override
     {
-        *this = static_cast<t>(*this);
+        *this = def;
     }
 
-    void bundle_value_changed() const override
-    {
-        emit valueChanged(static_cast<detail::value_type_t<t>>(get()));
-    }
+    never_inline
+    operator t() const { return std::forward<t>(get()); }
 
-    element_type operator()() const
+    never_inline
+    t operator->() const
     {
         return get();
     }
 
-private:
-    t get() const
+    never_inline
+    void reload() override
     {
-        t val = b->contains(self_name)
-                ? static_cast<t>(b->get<element_type>(self_name))
-                : def;
-        return detail::value_get_traits<t>::get(val, def);
+        if (!self_name.isEmpty())
+            *this = static_cast<t>(*this);
     }
 
+    never_inline
+    void bundle_value_changed() const override
+    {
+        if (!self_name.isEmpty())
+            emit valueChanged(traits::to_storage(get()));
+    }
+
+    never_inline
+    t operator()() const
+    {
+        return get();
+    }
+
+    template<typename u>
+    never_inline
+    u to() const
+    {
+        return static_cast<u>(std::forward<t>(get()));
+    }
+
+private:
     const t def;
 };
 
+#if defined _MSC_VER
 
-}
+#   if !defined OTR_OPT_VALUE
+#      define OTR_OPT_VALUE OTR_TEMPLATE_IMPORT
+#   endif
+
+    OTR_OPT_VALUE value<double>;
+    OTR_OPT_VALUE value<float>;
+    OTR_OPT_VALUE value<int>;
+    OTR_OPT_VALUE value<bool>;
+    OTR_OPT_VALUE value<QString>;
+    OTR_OPT_VALUE value<slider_value>;
+    OTR_OPT_VALUE value<QPointF>;
+    OTR_OPT_VALUE value<QVariant>;
+
+    OTR_OPT_VALUE value<QList<double>>;
+    OTR_OPT_VALUE value<QList<float>>;
+    OTR_OPT_VALUE value<QList<int>>;
+    OTR_OPT_VALUE value<QList<bool>>;
+    OTR_OPT_VALUE value<QList<QString>>;
+    OTR_OPT_VALUE value<QList<slider_value>>;
+    OTR_OPT_VALUE value<QList<QPointF>>;
+
+#endif
+
+} // ns options

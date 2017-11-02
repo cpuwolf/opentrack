@@ -21,6 +21,24 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+if(NOT CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install")
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "RELEASE" CACHE STRING "" FORCE)
+endif()
+
+if(APPLE)
+    if(NOT CMAKE_OSX_ARCHITECTURES)
+        set(CMAKE_OSX_ARCHITECTURES "x86_64")
+    endif()
+endif()
+
+if(MSVC AND MSVC_VERSION LESS "1900" AND NOT ".${CMAKE_CXX_COMPILER_ID}" STREQUAL ".Clang")
+    message(FATAL_ERROR "Visual Studio too old. Use Visual Studio 2015 Update 3 or newer.")
+endif()
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_COMPILER_IS_GNUCXX TRUE)
     set(CMAKE_COMPILER_IS_CLANG TRUE)
@@ -33,7 +51,7 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if((NOT CMAKE_COMPILER_IS_GNUCXX) EQUAL (NOT (NOT CMAKE_COMPILER_IS_GNUCC)))
-    message(FATAL_ERROR "cannot use GNU C xor GNU C++")
+    message(FATAL_ERROR "use either use both gcc and g++ or neither")
 endif()
 
 IF(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -41,18 +59,40 @@ IF(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if(MSVC)
-    add_definitions(-DNOMINMAX -D_CRT_SECURE_NO_WARNINGS)
-    add_definitions(-D_ITERATOR_DEBUG_LEVEL=0 -D_HAS_ITERATOR_DEBUGGING=0 -D_SECURE_SCL=0)
-    set(CMAKE_CXX_FLAGS " /std:c++14 -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS ${CMAKE_CXX_FLAGS} ")
-    set(CMAKE_C_FLAGS " -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS ${CMAKE_C_FLAGS} ")
+    add_definitions(-DNOMINMAX -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS -D_NO_DEBUG_HEAP)
+    add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
+    add_definitions(-D_HAS_EXCEPTIONS=0)
+    add_definitions(-D_SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING -D_SILENCE_CXX17_ADAPTOR_TYPEDEFS_DEPRECATION_WARNING)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Zi")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Zi")
+
+    if(NOT CMAKE_COMPILER_IS_CLANG)
+        if(MSVC_VERSION GREATER 1909) # visual studio 2017
+            set(__stuff "-permissive- -Qvec-report:1")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${__stuff}")
+            set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} ${__stuff}")
+        endif()
+
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std:c++latest")
+    else()
+        set(__stuff "-fms-compatibility -fms-compatibility-version=1911 -fms-extensions")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${__stuff} -std:c++latest -Xclang -std=c++17")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${__stuff}")
+    endif()
+
+    if(opentrack-64bit)
+        set(ent "-HIGHENTROPYVA")
+    else()
+        set(ent "")
+    endif()
 
     foreach (i SHARED MODULE EXE)
-        set(CMAKE_${i}_LINKER_FLAGS " /DYNAMICBASE /NXCOMPAT ${CMAKE_${i}_LINKER_FLAGS} ")
+        set(CMAKE_${i}_LINKER_FLAGS "${CMAKE_${i}_LINKER_FLAGS} -DYNAMICBASE -NXCOMPAT -DEBUG ${ent}")
     endforeach()
 endif()
 
 if(WIN32)
-  if(CMAKE_COMPILER_IS_GNUCXX)
+  if(CMAKE_COMPILER_IS_GNUCXX AND NOT MSVC)
     set(CMAKE_RC_COMPILER_INIT i686-w64-mingw32-windres)
     set(CMAKE_RC_COMPILE_OBJECT "<CMAKE_RC_COMPILER> --use-temp-file -O coff <DEFINES> -i <SOURCE> -o <OBJECT>")
   endif()
@@ -74,7 +114,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-include_directories(${CMAKE_SOURCE_DIR})
+include_directories("${CMAKE_SOURCE_DIR}")
 
 if(APPLE)
     set(CMAKE_MACOSX_RPATH OFF)
@@ -87,11 +127,16 @@ if(APPLE)
 endif()
 
 if(NOT MSVC)
-    set(CMAKE_CXX_STANDARD 14)
-    set(CMAKE_CXX_STANDARD_DEFAULT 14)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_DEFAULT 17)
     set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
     set(CMAKE_CXX_EXTENSIONS FALSE)
 endif()
+
+foreach(k _RELEASE _DEBUG _RELWITHDEBINFO _MINSIZEREL)
+    set(CMAKE_C_FLAGS${k} "${CMAKE_C_FLAGS${k}} -UNDEBUG")
+    set(CMAKE_CXX_FLAGS${k} "${CMAKE_CXX_FLAGS${k}} -UNDEBUG")
+endforeach()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS OFF)
 
@@ -104,6 +149,10 @@ endif()
 
 if(MINGW)
     add_definitions(-DMINGW_HAS_SECURE_API)
+endif()
+
+if(UNIX AND NOT APPLE)
+    include(FindPkgConfig)
 endif()
 
 set(opencv-modules opencv_calib3d opencv_core opencv_features2d opencv_imgcodecs opencv_imgproc opencv_objdetect opencv_videoio)

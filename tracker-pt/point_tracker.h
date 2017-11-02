@@ -9,8 +9,8 @@
 
 #include "compat/timer.hpp"
 #include "ftnoir_tracker_pt_settings.h"
-#include "affine.hpp"
-#include "numeric.hpp"
+#include "cv/affine.hpp"
+#include "cv/numeric.hpp"
 #include "camera.h"
 
 #include <opencv2/core.hpp>
@@ -42,8 +42,8 @@ struct PointModel final
 
     enum Model { Clip, Cap, Custom };
 
-    PointModel(settings_pt& s);
-    void set_model(settings_pt& s);
+    PointModel(const settings_pt& s);
+    void set_model(const settings_pt& s);
     void get_d_order(const vec2* points, unsigned* d_order, const vec2& d) const;
 };
 
@@ -67,14 +67,17 @@ private:
     // the points in model order
     using PointOrder = std::array<vec2, 3>;
 
+    bool maybe_use_old_point_order(const PointOrder& order, const CamInfo& info);
+    PointOrder prev_order, prev_scaled_order;
+
     PointOrder find_correspondences(const vec2* projected_points, const PointModel &model);
     PointOrder find_correspondences_previous(const vec2* points, const PointModel &model, const CamInfo& info);
     int POSIT(const PointModel& point_model, const PointOrder& order, f focal_length);  // The POSIT algorithm, returns the number of iterations
 
-    Affine X_CM; // trafo from model to camera
+    Affine X_CM; // transform from model to camera
 
     Timer t;
-    bool init_phase;
+    bool init_phase, prev_order_valid;
 };
 
 } // ns types

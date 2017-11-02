@@ -76,7 +76,7 @@ void KalmanProcessNoiseScaler::update(KalmanFilter &kf, double dt)
     {
         alpha = T1 / T2;
         alpha = std::sqrt(alpha);
-        alpha = std::min(1000., std::max(0.001, alpha));
+        alpha = std::fmin(1000., std::fmax(0.001, alpha));
     }
     kf.process_noise_cov = alpha * base_cov;
     //qDebug() << "alpha = " << alpha;
@@ -122,8 +122,8 @@ void kalman::fill_process_noise_cov_matrix(StateMatrix &target, double dt) const
     double sigma_angle = s.process_sigma_rot;
     double a_pos = sigma_pos * sigma_pos * dt;
     double a_ang = sigma_angle * sigma_angle * dt;
-    static constexpr double b = 20;
-    static constexpr double c = 1.;
+    constexpr double b = 20;
+    constexpr double c = 1.;
     for (int i = 0; i < 3; ++i)
     {
         target(i, i) = a_pos;

@@ -11,13 +11,22 @@
 #include "options/options.hpp"
 using namespace options;
 
+enum pt_color_type
+{
+    // explicit values, gotta preserve the numbering in .ini
+    // don't reuse when removing some of the modes
+    pt_color_natural = 2,
+    pt_color_red_only = 3,
+    pt_color_average = 5,
+    pt_color_blue_only = 6,
+};
+
 struct settings_pt : opts
 {
     value<QString> camera_name;
     value<int> cam_res_x,
                cam_res_y,
-               cam_fps,
-               threshold;
+               cam_fps;
     value<double> min_point_size, max_point_size;
 
     value<int> m01_x, m01_y, m01_z;
@@ -33,6 +42,9 @@ struct settings_pt : opts
     value<bool> dynamic_pose;
     value<int> init_phase_timeout;
     value<bool> auto_threshold;
+    value<pt_color_type> blob_color;
+
+    value<slider_value> threshold_slider;
 
     settings_pt() :
         opts("tracker-pt"),
@@ -40,7 +52,6 @@ struct settings_pt : opts
         cam_res_x(b, "camera-res-width", 640),
         cam_res_y(b, "camera-res-height", 480),
         cam_fps(b, "camera-fps", 30),
-        threshold(b, "threshold-primary", 128),
         min_point_size(b, "min-point-size", 1),
         max_point_size(b, "max-point-size", 50),
         m01_x(b, "m_01-x", 0),
@@ -62,7 +73,9 @@ struct settings_pt : opts
         cap_z(b, "cap-z", 100),
         fov(b, "camera-fov", 56),
         dynamic_pose(b, "dynamic-pose-resolution", true),
-        init_phase_timeout(b, "init-phase-timeout", 500),
-        auto_threshold(b, "automatic-threshold", true)
+        init_phase_timeout(b, "init-phase-timeout", 250),
+        auto_threshold(b, "automatic-threshold", true),
+        blob_color(b, "blob-color", pt_color_average),
+        threshold_slider(b, "threshold-slider", slider_value(128, 0, 255))
     {}
 };

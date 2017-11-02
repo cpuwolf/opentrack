@@ -13,14 +13,11 @@
 #include "opentrack-library-path.h"
 #include <QTextDecoder>
 #include <QFile>
-#include <QCoreApplication>
 #include <QString>
 #include <QDebug>
 
 #include <utility>
 #include <algorithm>
-
-using std::move;
 
 const QTextCodec* CSV::m_codec = QTextCodec::codecForName("System");
 const QRegExp CSV::m_rx = QRegExp(QString("((?:(?:[^;\\n]*;?)|(?:\"[^\"]*\";?))*)?\\n?"));
@@ -79,7 +76,7 @@ bool CSV::parseLine(QStringList& ret)
             else if (m_rx2.cap(2).size() > 0)
                 col = m_rx2.cap(2);
 
-            list << move(col);
+            list << col;
 
             if (col.size())
                 pos2 += m_rx2.matchedLength();
@@ -87,7 +84,7 @@ bool CSV::parseLine(QStringList& ret)
                 pos2++;
         }
     }
-    ret = move(list);
+    ret = std::move(list);
     return true;
 }
 
@@ -96,11 +93,13 @@ bool CSV::getGameData(int id, unsigned char* table, QString& gamename)
     for (int i = 0; i < 8; i++)
         table[i] = 0;
 
+    if (id != 0)
+        qDebug() << "csv: lookup game id" << id;
+
     QString id_str(QString::number(id));
 
     static const QString csv_path(OPENTRACK_BASE_PATH +
-                                  OPENTRACK_DOC_PATH +
-                                  QString("settings/facetracknoir supported games.csv"));
+                                  OPENTRACK_DOC_PATH "settings/facetracknoir supported games.csv");
 
     QFile file(csv_path);
 
@@ -133,8 +132,8 @@ bool CSV::getGameData(int id, unsigned char* table, QString& gamename)
         {
             if (gameLine.at(6).compare(id_str, Qt::CaseInsensitive) == 0)
             {
-                const QString proto(move(gameLine.at(3)));
-                const QString name(move(gameLine.at(1)));
+                const QString proto(std::move(gameLine.at(3)));
+                const QString name(std::move(gameLine.at(1)));
 
                 const QByteArray id_cstr = gameLine.at(7).toLatin1();
 
@@ -167,8 +166,7 @@ bool CSV::getGameData(int id, unsigned char* table, QString& gamename)
                         table[i] = t(tmp[i]);
                     }
                 }
-                //qDebug() << "csv: game-id" << id_str << "proto" << proto;
-                gamename = move(name);
+                gamename = std::move(name);
                 return true;
             }
         }
@@ -178,7 +176,8 @@ bool CSV::getGameData(int id, unsigned char* table, QString& gamename)
         }
     }
 
-    qDebug() << "unknown game connected" << id;
+    if (id)
+        qDebug() << "unknown game connected" << id;
 
     return false;
 }

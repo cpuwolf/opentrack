@@ -10,21 +10,12 @@
 
 #include "export.hpp"
 
-#ifdef Q_MOC_RUN
-typedef void* LPDIRECTINPUT8;
-#else
-#ifndef DIRECTINPUT_VERSION
-#   define DIRECTINPUT_VERSION 0x800
+#undef DIRECTINPUT_VERSION
+#define DIRECTINPUT_VERSION 0x800
 #include <dinput.h>
-#endif
 #include <atomic>
-#endif
 
-#ifdef _MSC_VER
-    template struct __declspec(dllimport) std::atomic<int>;
-#endif
-
-class OPENTRACK_DINPUT_EXPORT dinput_handle final
+class OTR_DINPUT_EXPORT dinput_handle final
 {
 public:
     class di_t;

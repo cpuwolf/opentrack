@@ -29,7 +29,7 @@ struct move_accela_to_sliders : migration
     static constexpr const char* new_bundle_name = "accela-sliders";
     static constexpr const char* slider_name = "rotation-nonlinearity";
 
-    using map_ = struct { map s[8]; };
+    struct map_ { map s[8]; };
 
     static map_ make_settings(settings_accela& s)
     {
@@ -37,9 +37,9 @@ struct move_accela_to_sliders : migration
         {
             {
                 { "rotation-threshold", 4, 1, &s.rot_sensitivity },
-                { "translation-threshold", 4, 1, &s.trans_sensitivity },
+                { "translation-threshold", 4, 1, &s.pos_sensitivity },
                 { "rotation-deadzone", 4, 0, &s.rot_deadzone },
-                { "translation-deadzone", 4, 0, &s.trans_deadzone },
+                { "translation-deadzone", 4, 0, &s.pos_deadzone },
                 { "ewma", 1.25, 0, &s.ewma },
                 { nullptr, 0, 0, nullptr },
             }
@@ -107,18 +107,13 @@ struct move_accela_to_sliders : migration
             tmp = val;
         }
 
-        value<slider_value> tmp(new_b, slider_name, slider_value(-1e6, s.rot_nonlinearity().min(), s.rot_nonlinearity().max()));
-        tmp = old_b->contains(slider_name)
-                  ? old_b->get<slider_value>(slider_name)
-                  : slider_value(1.1, 1, 1.75);
-
         new_b->save();
     }
 };
 
 // odr
-constexpr double settings_accela::rot_gains[16][2];
-constexpr double settings_accela::trans_gains[16][2];
+constexpr settings_accela::gains settings_accela::rot_gains[16];
+constexpr settings_accela::gains settings_accela::pos_gains[16];
 
 constexpr const char* move_accela_to_sliders::old_bundle_name;
 constexpr const char* move_accela_to_sliders::new_bundle_name;

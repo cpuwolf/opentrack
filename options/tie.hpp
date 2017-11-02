@@ -22,10 +22,15 @@
 
 #include <cmath>
 
+#if defined __GNUG__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
 namespace options {
 
 template<typename t>
-typename std::enable_if<std::is_enum<t>::value>::type
+std::enable_if_t<std::is_enum<t>::value>
 tie_setting(value<t>& v, QComboBox* cb)
 {
     cb->setCurrentIndex(cb->findData(int(static_cast<t>(v))));
@@ -42,20 +47,50 @@ tie_setting(value<t>& v, QComboBox* cb)
                                                });
                         },
                         v.DIRECT_CONNTYPE);
-    base_value::connect(&v, static_cast<void (base_value::*)(int) const>(&base_value::valueChanged),
-                        cb, [cb](int x) { cb->setCurrentIndex(cb->findData(x)); },
+    base_value::connect(&v, base_value::signal_fun<int>(),
+                        cb, [cb](int x) {
+                            run_in_thread_sync(cb, [&]() { cb->setCurrentIndex(cb->findData(x)); });
+                        },
+                        v.DIRECT_CONNTYPE);
+}
+
+template<typename t, typename F>
+void tie_setting(value<t>& v, QLabel* lb, F&& fun)
+{
+    auto closure = [=](cv_qualified<t> x) { lb->setText(fun(x)); };
+
+    closure(v());
+    base_value::connect(&v, base_value::signal_fun<t>(),
+                        lb, closure,
                         v.SAFE_CONNTYPE);
 }
 
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<int>& v, QComboBox* cb);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<QString>& v, QComboBox* cb);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<bool>& v, QCheckBox* cb);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<double>& v, QDoubleSpinBox* dsb);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<int>& v, QSpinBox* sb);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<int>& v, QSlider* sl);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<QString>& v, QLineEdit* le);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<QString>& v, QLabel* lb);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<int>& v, QTabWidget* t);
-OPENTRACK_OPTIONS_EXPORT void tie_setting(value<slider_value>& v, QSlider* w);
+template<typename t, typename F>
+void tie_setting(value<t>& v, QObject* obj, F&& fun)
+{
+    if (obj == nullptr)
+        abort();
+
+    fun(v());
+
+    base_value::connect(&v, base_value::signal_fun<t>(),
+                        obj, fun,
+                        v.DIRECT_CONNTYPE);
+}
+
+OTR_OPTIONS_EXPORT void tie_setting(value<int>& v, QComboBox* cb);
+OTR_OPTIONS_EXPORT void tie_setting(value<QString>& v, QComboBox* cb);
+OTR_OPTIONS_EXPORT void tie_setting(value<QVariant>& v, QComboBox* cb);
+OTR_OPTIONS_EXPORT void tie_setting(value<bool>& v, QCheckBox* cb);
+OTR_OPTIONS_EXPORT void tie_setting(value<double>& v, QDoubleSpinBox* dsb);
+OTR_OPTIONS_EXPORT void tie_setting(value<int>& v, QSpinBox* sb);
+OTR_OPTIONS_EXPORT void tie_setting(value<QString>& v, QLineEdit* le);
+OTR_OPTIONS_EXPORT void tie_setting(value<QString>& v, QLabel* lb);
+OTR_OPTIONS_EXPORT void tie_setting(value<int>& v, QTabWidget* t);
+OTR_OPTIONS_EXPORT void tie_setting(value<slider_value>& v, QSlider* w);
 
 } // ns options
+
+#if defined __GNUG__
+#   pragma GCC diagnostic pop
+#endif

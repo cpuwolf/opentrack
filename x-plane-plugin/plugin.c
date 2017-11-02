@@ -14,6 +14,7 @@
 #include <sys/mman.h>
 #include <limits.h>
 #include <unistd.h>
+#include <math.h>
 
 #include <XPLMPlugin.h>
 #include <XPLMDataAccess.h>
@@ -34,14 +35,14 @@
 #include "compat/export.hpp"
 
 enum Axis {
-        TX = 0, TY, TZ, Yaw, Pitch, Roll
+    TX = 0, TY, TZ, Yaw, Pitch, Roll
 };
 
-typedef struct PortableLockedShm
+typedef struct shm_wrapper
 {
     void* mem;
     int fd, size;
-} PortableLockedShm;
+} shm_wrapper;
 
 typedef struct WineSHM
 {
@@ -51,9 +52,9 @@ typedef struct WineSHM
     bool stop;
 } WineSHM;
 
-static PortableLockedShm* lck_posix = NULL;
+static shm_wrapper* lck_posix = NULL;
 static WineSHM* shm_posix = NULL;
-static void *view_x, *view_y, *view_z, *view_heading, *view_pitch;
+static void *view_x, *view_y, *view_z, *view_heading, *view_pitch, *view_roll;
 static float offset_x, offset_y, offset_z;
 static XPLMCommandRef track_toggle = NULL, translation_disable_toggle = NULL;
 static int track_disabled = 1;
@@ -66,14 +67,14 @@ static void reinit_offset() {
 }
 
 #ifdef __GNUC__
-#   define OT_UNUSED(varname) varname __attribute__((__unused__))
+#   define unused(varname) varname __attribute__((__unused__))
 #else
-#   define OT_UNUSED(varname) varname
+#   define unused(varname) varname
 #endif
 
-PortableLockedShm* PortableLockedShm_init(const char *shmName, const char *OT_UNUSED(mutexName), int mapSize)
+shm_wrapper* shm_wrapper_init(const char *shmName, const char *unused(mutexName), int mapSize)
 {
-    PortableLockedShm* self = malloc(sizeof(PortableLockedShm));
+    shm_wrapper* self = malloc(sizeof(shm_wrapper));
     char shm_filename[NAME_MAX];
     shm_filename[0] = '/';
     strncpy(shm_filename+1, shmName, NAME_MAX-2);
@@ -86,7 +87,7 @@ PortableLockedShm* PortableLockedShm_init(const char *shmName, const char *OT_UN
     return self;
 }
 
-void PortableLockedShm_free(PortableLockedShm* self)
+void shm_wrapper_free(shm_wrapper* self)
 {
     /*(void) shm_unlink(shm_filename);*/
     (void) munmap(self->mem, self->size);
@@ -94,33 +95,34 @@ void PortableLockedShm_free(PortableLockedShm* self)
     free(self);
 }
 
-void PortableLockedShm_lock(PortableLockedShm* self)
+void shm_wrapper_lock(shm_wrapper* self)
 {
     flock(self->fd, LOCK_SH);
 }
 
-void PortableLockedShm_unlock(PortableLockedShm* self)
+void shm_wrapper_unlock(shm_wrapper* self)
 {
     flock(self->fd, LOCK_UN);
 }
 
 float write_head_position(
-        float                OT_UNUSED(inElapsedSinceLastCall),
-        float                OT_UNUSED(inElapsedTimeSinceLastFlightLoop),
-        int                  OT_UNUSED(inCounter),
-        void *               OT_UNUSED(inRefcon) )
+        float                unused(inElapsedSinceLastCall),
+        float                unused(inElapsedTimeSinceLastFlightLoop),
+        int                  unused(inCounter),
+        void *               unused(inRefcon) )
 {
     if (lck_posix != NULL && shm_posix != NULL) {
-        PortableLockedShm_lock(lck_posix);
+        shm_wrapper_lock(lck_posix);
         if (!translation_disabled)
         {
             XPLMSetDataf(view_x, shm_posix->data[TX] * 1e-3 + offset_x);
             XPLMSetDataf(view_y, shm_posix->data[TY] * 1e-3 + offset_y);
             XPLMSetDataf(view_z, shm_posix->data[TZ] * 1e-3 + offset_z);
         }
-        XPLMSetDataf(view_heading, shm_posix->data[Yaw] * 180 / 3.141592654);
-        XPLMSetDataf(view_pitch, shm_posix->data[Pitch] * 180 / 3.141592654);
-        PortableLockedShm_unlock(lck_posix);
+        XPLMSetDataf(view_heading, shm_posix->data[Yaw] * 180 / M_PI);
+        XPLMSetDataf(view_pitch, shm_posix->data[Pitch] * 180 / M_PI);
+        XPLMSetDataf(view_roll, shm_posix->data[Roll] * 180 / M_PI);
+        shm_wrapper_unlock(lck_posix);
     }
     return -1.0;
 }
@@ -160,12 +162,13 @@ static int TranslationToggleHandler( XPLMCommandRef inCommand,
     return 0;
 }
 
-PLUGIN_API OPENTRACK_COMPAT_EXPORT int XPluginStart ( char * outName, char * outSignature, char * outDescription ) {
+PLUGIN_API OTR_COMPAT_EXPORT int XPluginStart ( char * outName, char * outSignature, char * outDescription ) {
     view_x = XPLMFindDataRef("sim/aircraft/view/acf_peX");
     view_y = XPLMFindDataRef("sim/aircraft/view/acf_peY");
     view_z = XPLMFindDataRef("sim/aircraft/view/acf_peZ");
     view_heading = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
     view_pitch = XPLMFindDataRef("sim/graphics/view/pilots_head_the");
+    view_roll = XPLMFindDataRef("sim/graphics/view/field_of_view_roll_deg");
 
     track_toggle = XPLMCreateCommand("opentrack/toggle", "Disable/Enable head tracking");
     translation_disable_toggle = XPLMCreateCommand("opentrack/toggle_translation", "Disable/Enable input translation from opentrack");
@@ -182,7 +185,7 @@ PLUGIN_API OPENTRACK_COMPAT_EXPORT int XPluginStart ( char * outName, char * out
 
 
     if (view_x && view_y && view_z && view_heading && view_pitch && track_toggle && translation_disable_toggle) {
-        lck_posix = PortableLockedShm_init(WINE_SHM_NAME, WINE_MTX_NAME, sizeof(WineSHM));
+        lck_posix = shm_wrapper_init(WINE_SHM_NAME, WINE_MTX_NAME, sizeof(WineSHM));
         if (lck_posix->mem == (void*)-1) {
             fprintf(stderr, "opentrack failed to init SHM!\n");
             return 0;
@@ -198,29 +201,29 @@ PLUGIN_API OPENTRACK_COMPAT_EXPORT int XPluginStart ( char * outName, char * out
     return 0;
 }
 
-PLUGIN_API OPENTRACK_COMPAT_EXPORT void XPluginStop ( void ) {
+PLUGIN_API OTR_COMPAT_EXPORT void XPluginStop ( void ) {
     if (lck_posix)
     {
-        PortableLockedShm_free(lck_posix);
+        shm_wrapper_free(lck_posix);
         lck_posix = NULL;
         shm_posix = NULL;
     }
 }
 
-PLUGIN_API OPENTRACK_COMPAT_EXPORT void XPluginEnable ( void ) {
+PLUGIN_API OTR_COMPAT_EXPORT void XPluginEnable ( void ) {
     XPLMRegisterFlightLoopCallback(write_head_position, -1.0, NULL);
     track_disabled = 0;
 }
 
-PLUGIN_API OPENTRACK_COMPAT_EXPORT void XPluginDisable ( void ) {
+PLUGIN_API OTR_COMPAT_EXPORT void XPluginDisable ( void ) {
     XPLMUnregisterFlightLoopCallback(write_head_position, NULL);
     track_disabled = 1;
 }
 
-PLUGIN_API OPENTRACK_COMPAT_EXPORT void XPluginReceiveMessage(
-        XPLMPluginID    OT_UNUSED(inFromWho),
-        int             OT_UNUSED(inMessage),
-        void *          OT_UNUSED(inParam))
+PLUGIN_API OTR_COMPAT_EXPORT void XPluginReceiveMessage(
+        XPLMPluginID    unused(inFromWho),
+        int             unused(inMessage),
+        void *          unused(inParam))
 {
     if (inMessage == XPLM_MSG_AIRPORT_LOADED)
         reinit_offset();

@@ -1,12 +1,12 @@
 #include "tobii-eyex.hpp"
+#include "compat/math-imports.hpp"
+
 #include <cstdlib>
 #include <cstdio>
-#include <cmath>
+
 #include <QDebug>
 #include <QMutexLocker>
 #include <QMessageBox>
-
-// XXX TODO whole opentrack needs different debug levels -sh 20160801
 
 //#define TOBII_EYEX_DEBUG_PRINTF
 #define TOBII_EYEX_VERBOSE_PRINTF
@@ -236,7 +236,7 @@ void tobii_eyex_tracker::start_tracker(QFrame*)
         dbg_verbose("api initialized");
 }
 
-tobii_eyex_tracker::num tobii_eyex_tracker::gain(num x_)
+tobii_eyex_tracker::num tobii_eyex_tracker::gain(num x)
 {
     return 1;
 }
@@ -279,9 +279,9 @@ void tobii_eyex_tracker::data(double* data)
 
         using std::fabs;
 
-        static constexpr double max_yaw = 45, max_pitch = 30;
-        static constexpr double c_yaw = 3;
-        static constexpr double c_pitch = c_yaw * max_pitch / max_yaw;
+        constexpr double max_yaw = 45, max_pitch = 30;
+        constexpr double c_yaw = 3;
+        constexpr double c_pitch = c_yaw * max_pitch / max_yaw;
 
         const double yaw_delta = gain(fabs(x_)) * signum(x_) * c_yaw * dt;
         const double pitch_delta = gain(fabs(y_)) * signum(y_) * c_pitch * dt;

@@ -8,47 +8,86 @@
 
 #include <openvr.h>
 
-#include <atomic>
 #include <cmath>
 #include <memory>
+#include <tuple>
 
 #include <QString>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QList>
 
 using namespace options;
+using error_t = vr::EVRInitError;
+using vr_t = vr::IVRSystem*;
+
+using tt = std::tuple<vr_t, error_t>;
+using pose_t = vr::TrackedDevicePose_t;
+using origin = vr::ETrackingUniverseOrigin;
 
 struct settings : opts
 {
-    value<int> order;
+    value<QVariant> device_serial;
     settings() :
         opts("valve-steamvr"),
-        order(b, "rotation-order", 0)
+        device_serial(b, "serial", QVariant(QVariant::String))
     {}
 };
 
-class steamvr : public ITracker
+struct device_spec
 {
+    vr::TrackedDevicePose_t pose;
+    QString model, serial, type;
+    unsigned k;
+    QString to_string() const;
+    bool is_connected;
+};
+
+struct device_list final
+{
+    using maybe_pose = std::tuple<bool, pose_t>;
+
+    device_list();
+    void refresh_device_list();
+    const QList<device_spec>& devices() const { return device_specs; }
+
+    static never_inline maybe_pose get_pose(int k);
+    static QString strerror(error_t error);
+    static constexpr int max_devices = int(vr::k_unMaxTrackedDeviceCount);
+
+    template<typename F>
+    friend auto with_vr_lock(F&& fun) -> decltype(fun(vr_t(), error_t()));
+
+private:
+    QList<device_spec> device_specs;
+    static QMutex mtx;
+    static tt vr_init_();
+    static void fill_device_specs(QList<device_spec>& list);
+    static tt vr_init();
+};
+
+class steamvr : public QObject, public ITracker
+{
+    Q_OBJECT
+
+    using error_t = vr::EVRInitError;
+    using vr_t = vr::IVRSystem*;
+
 public:
     steamvr();
     ~steamvr() override;
     void start_tracker(QFrame *) override;
     void data(double *data) override;
+    bool center() override;
+
 private:
-
-    using error_t = vr::EVRInitError;
-    using vr_t = vr::IVRSystem*;
-
-    vr_t vr;
+    static void matrix_to_euler(double& yaw, double& pitch, double& roll, const vr::HmdMatrix34_t& result);
 
     settings s;
+    int device_index;
 
     using rmat = euler::rmat;
     using euler_t = euler::euler_t;
-
-    static void vr_deleter();
-    static vr_t vr_init(error_t& error);
-    static QString strerror(error_t error);
 };
 
 class steamvr_dialog : public ITrackerDialog
@@ -57,12 +96,10 @@ class steamvr_dialog : public ITrackerDialog
 public:
     steamvr_dialog();
 
-    void register_tracker(ITracker *) override;
-    void unregister_tracker() override;
 private:
     Ui::dialog ui;
     settings s;
-    vr::IVRSystem* vr;
+
 private slots:
     void doOK();
     void doCancel();
@@ -71,7 +108,6 @@ private slots:
 class steamvr_metadata : public Metadata
 {
 public:
-    QString name() { return QString(QCoreApplication::translate("steamvr_metadata", "Valve SteamVR")); }
-    QIcon icon() { return QIcon(":/images/rift_tiny.png"); }
+    QString name() override { return QString(QCoreApplication::translate("steamvr_metadata", "Valve SteamVR")); }
+    QIcon icon() override { return QIcon(":/images/rift_tiny.png"); }
 };
-

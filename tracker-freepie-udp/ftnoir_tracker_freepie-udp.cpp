@@ -1,29 +1,19 @@
 #include "ftnoir_tracker_freepie-udp.h"
 #include "api/plugin-api.hpp"
+#include "compat/util.hpp"
 
 #include <cinttypes>
 #include <algorithm>
 #include <cmath>
 
-
-tracker_freepie::tracker_freepie() : pose { 0,0,0, 0,0,0 }, should_quit(false)
+tracker_freepie::tracker_freepie() : pose { 0,0,0, 0,0,0 }
 {
 }
 
 tracker_freepie::~tracker_freepie()
 {
-    should_quit = true;
+    requestInterruption();
     wait();
-}
-
-template<typename t>
-static const t bound(t datum, t least, t max)
-{
-    if (datum < least)
-        return least;
-    if (datum > max)
-        return max;
-    return datum;
 }
 
 void tracker_freepie::run() {
@@ -34,7 +24,9 @@ void tracker_freepie::run() {
         float fl[12];
     } data;
 #pragma pack(pop)
-    enum F {
+
+    enum F
+    {
         flag_Raw = 1 << 0,
         flag_Orient = 1 << 1,
         Mask = flag_Raw | flag_Orient
@@ -42,12 +34,15 @@ void tracker_freepie::run() {
 
     sock.bind(QHostAddress::Any, (unsigned short) s.port, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint);
 
-    while (!should_quit) {
-        int order[] = {
-            bound<int>(s.idx_x, 0, 2),
-            bound<int>(s.idx_y, 0, 2),
-            bound<int>(s.idx_z, 0, 2)
+    while (!isInterruptionRequested())
+    {
+        int order[] =
+        {
+            clamp(s.idx_x, 0, 2),
+            clamp(s.idx_y, 0, 2),
+            clamp(s.idx_z, 0, 2)
         };
+
         double orient[3] = {0, 0, 0};
         bool filled = false;
 
@@ -80,23 +75,29 @@ void tracker_freepie::run() {
 
         if (filled)
         {
-            static const int add_cbx[] = {
+            static constexpr int add_cbx[] =
+            {
                 0,
                 90,
                 -90,
                 180,
                 -180,
             };
-            int indices[] = { s.add_yaw, s.add_pitch, s.add_roll };
+
+            int add_indices[] = { s.add_yaw, s.add_pitch, s.add_roll };
+
             QMutexLocker foo(&mtx);
-            static constexpr double r2d = 180 / M_PI;
+
+            constexpr double r2d = 180 / M_PI;
+
             for (int i = 0; i < 3; i++)
             {
-                int val = 0;
-                int idx = indices[order[i]];
-                if (idx >= 0 && idx < (int)(sizeof(add_cbx) / sizeof(*add_cbx)))
-                    val = add_cbx[idx];
-                pose[Yaw + i] = r2d * orient[order[i]] + val;
+                const int axis = order[i];
+                const int add_idx = add_indices[i];
+                int add = 0;
+                if (add_idx >= 0 && add_idx < (int)std::size(add_cbx))
+                    add = add_cbx[add_idx];
+                pose[Yaw + i] = r2d * orient[axis] + add;
             }
         }
         usleep(4000);

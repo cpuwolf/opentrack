@@ -21,23 +21,23 @@
 #include <functional>
 #include <vector>
 
-struct OPENTRACK_DINPUT_EXPORT Key
+struct OTR_DINPUT_EXPORT Key
 {
     QString guid;
-    int keycode;
-    bool shift;
-    bool ctrl;
-    bool alt;
-    bool held;
-    bool enabled;
+    int keycode = 0;
+    bool shift = false;
+    bool ctrl = false;
+    bool alt = false;
+    bool held = true;
+    bool enabled = true;
     Timer timer;
 public:
-    Key() : keycode(0), shift(false), ctrl(false), alt(false), held(true), enabled(true) {}
+    Key();
 
     bool should_process();
 };
 
-struct OPENTRACK_DINPUT_EXPORT KeybindingWorker : private QThread
+struct OTR_DINPUT_EXPORT KeybindingWorker : private QThread
 {
     using fun = std::function<void(const Key&)>;
 
@@ -48,7 +48,9 @@ private:
     QMutex mtx;
     QMainWindow fake_main_window;
     dinput_handle::di_t din;
-    volatile bool should_quit;
+
+    bool keystate[256] {};
+    bool old_keystate[256] {};
 
     void run() override;
     bool init();
@@ -58,6 +60,9 @@ private:
     fun* _add_receiver(fun &receiver);
     void remove_receiver(fun* pos);
     ~KeybindingWorker();
+
+    static constexpr int num_keyboard_states = 128;
+    DIDEVICEOBJECTDATA keyboard_states[num_keyboard_states];
 
     KeybindingWorker(const KeybindingWorker&) = delete;
     KeybindingWorker& operator=(KeybindingWorker&) = delete;

@@ -32,21 +32,22 @@ namespace options {
 
 namespace detail {
 
+void set_base_value_to_default(base_value* val);
+
 struct bundler;
 
-class OPENTRACK_OPTIONS_EXPORT bundle final : public QObject, public connector
+class OTR_OPTIONS_EXPORT bundle final : public QObject, public connector
 {
-    class OPENTRACK_OPTIONS_EXPORT mutex final : public QMutex
+    Q_OBJECT
+
+    class OTR_OPTIONS_EXPORT mutex final : public QMutex
     {
     public:
         mutex(QMutex::RecursionMode mode) : QMutex(mode) {}
         operator QMutex*() const { return const_cast<QMutex*>(static_cast<const QMutex*>(this)); }
     };
 
-    Q_OBJECT
 private:
-    friend bundler;
-
     mutex mtx;
     const QString group_name;
     group saved;
@@ -63,15 +64,12 @@ signals:
     void saving() const;
     void changed() const;
 public:
-    bundle(const QString& group_name);
-    ~bundle() override;
+    never_inline bundle(const QString& group_name);
+    never_inline ~bundle() override;
     QString name() const { return group_name; }
-    void reload(std::shared_ptr<QSettings> settings = group::ini_file());
-    void store_kv(const QString& name, const QVariant& datum);
-    bool contains(const QString& name) const;
-    void save();
-    void save_deferred(QSettings& s);
-    bool is_modified() const;
+    never_inline void store_kv(const QString& name, const QVariant& datum);
+    never_inline bool contains(const QString& name) const;
+    never_inline bool is_modified() const;
 
     template<typename t>
     t get(const QString& name) const
@@ -79,11 +77,15 @@ public:
         QMutexLocker l(mtx);
         return transient.get<t>(name);
     }
+public slots:
+    void save();
+    void reload();
+    void set_all_to_default();
 };
 
-OPENTRACK_OPTIONS_EXPORT bundler& singleton();
+OTR_OPTIONS_EXPORT bundler& singleton();
 
-struct OPENTRACK_OPTIONS_EXPORT bundler
+struct OTR_OPTIONS_EXPORT bundler
 {
 public:
     using k = QString;
@@ -101,12 +103,12 @@ public:
     static void refresh_all_bundles();
 };
 
-OPENTRACK_OPTIONS_EXPORT bundler& singleton();
-}
+OTR_OPTIONS_EXPORT bundler& singleton();
+} // ns options::detail
 
 using bundle_ = detail::bundle;
 using bundle = std::shared_ptr<bundle_>;
 
-OPENTRACK_OPTIONS_EXPORT std::shared_ptr<bundle_> make_bundle(const QString& name);
+OTR_OPTIONS_EXPORT std::shared_ptr<bundle_> make_bundle(const QString& name);
 
-}
+} // ns options

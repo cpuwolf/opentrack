@@ -33,7 +33,6 @@ private:
     double last_recv_pose[6], last_recv_pose2[6];
     QMutex mutex;
     settings s;
-    volatile bool should_quit;
 };
 
 class dialog_udp: public ITrackerDialog
@@ -54,7 +53,7 @@ private slots:
 class udpDll : public Metadata
 {
 public:
-    QString name() { return QString(QCoreApplication::translate("udpDll", "UDP sender")); }
+    QString name() { return QString(QCoreApplication::translate("udp_tracker", "UDP over network")); }
     QIcon icon() { return QIcon(":/images/facetracknoir.png"); }
 };
 

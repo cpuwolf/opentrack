@@ -11,14 +11,17 @@
 #include "api/plugin-api.hpp"
 #include "ftnoir_tracker_pt_settings.h"
 
-#include "numeric.hpp"
+#include "cv/numeric.hpp"
 
 #include "camera.h"
 #include "point_extractor.h"
 #include "point_tracker.h"
-#include "compat/timer.hpp"
 #include "cv/video-widget.hpp"
 #include "compat/util.hpp"
+
+#include <atomic>
+#include <memory>
+#include <vector>
 
 #include <QCoreApplication>
 #include <QThread>
@@ -27,9 +30,6 @@
 #include <QTime>
 #include <QLayout>
 #include <QSize>
-#include <atomic>
-#include <memory>
-#include <vector>
 
 class TrackerDialog_PT;
 
@@ -52,7 +52,8 @@ public:
     int  get_n_points();
     bool get_cam_info(CamInfo* info);
 public slots:
-    void apply_settings();
+    void maybe_reopen_camera();
+    void set_fov(int value);
 protected:
     void run() override;
 private:
@@ -70,19 +71,18 @@ private:
     PointExtractor point_extractor;
     PointTracker   point_tracker;
 
-    qshared<cv_video_widget> video_widget;
-    qshared<QLayout> layout;
+    std::unique_ptr<cv_video_widget> video_widget;
+    std::unique_ptr<QLayout> layout;
 
     settings_pt s;
-    Timer time;
     cv::Mat frame, preview_frame;
     std::vector<vec2> points;
 
     QSize preview_size;
 
-    volatile unsigned point_count;
-    volatile unsigned char commands;
-    volatile bool ever_success;
+    std::atomic<unsigned> point_count;
+    std::atomic<unsigned char> commands;
+    std::atomic<bool> ever_success;
 
     static constexpr f rad2deg = f(180/M_PI);
     //static constexpr float deg2rad = float(M_PI/180);
