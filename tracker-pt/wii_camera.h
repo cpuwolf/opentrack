@@ -41,7 +41,6 @@ struct WIICamera final : pt_camera
     void show_camera_settings() override;
 
 private:
-    warn_result_unused bool _get_frame(cv::Mat& frame);
 
     double dt_mean, fov;
 
