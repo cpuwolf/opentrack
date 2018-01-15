@@ -44,10 +44,35 @@ WIIPointExtractor::WIIPointExtractor(const QString& module_name) : s(module_name
 void WIIPointExtractor::extract_points(const pt_frame& frame_, pt_preview& preview_frame_, std::vector<vec2>& points)
 {
     const cv::Mat& frame = frame_.as_const<WIIFrame>()->mat;
-    cv::Mat& preview_frame = *preview_frame_.as<Preview>();
+	std::vector<vec2>& pts = frame_.as<WIIFrame>()->points;
+	const vec2* ptds = pts.data();
+    cv::Mat& preview_frame = *preview_frame_.as<WIIPreview>();
+	int point_count = points.size();
 
-    const int W = frame_gray.cols;
-    const int H = frame_gray.rows;
+	auto fun = [&](const vec2& p, const cv::Scalar& color, int thinkness = 1)
+	{
+		static constexpr int len = 9;
 
+		cv::Point p2(iround(p[0] * preview_frame.cols + preview_frame.cols / 2),
+			iround(-p[1] * preview_frame.cols + preview_frame.rows / 2));
+
+		cv::line(preview_frame,
+			cv::Point(p2.x - len, p2.y),
+			cv::Point(p2.x + len, p2.y),
+			color,
+			thinkness);
+		cv::line(preview_frame,
+			cv::Point(p2.x, p2.y - len),
+			cv::Point(p2.x, p2.y + len),
+			color,
+			thinkness);
+	};
+	for (unsigned i = 0; i < PointModel::N_POINTS; ++i)
+	{
+		//if (dot_sizes)
+		//	fun(ptds[i], cv::Scalar(0, 255, 0), dot.Size);
+		//else
+			fun(ptds[i], cv::Scalar(0, 255, 0));
+	}
 }
 

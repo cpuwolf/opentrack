@@ -48,6 +48,8 @@ struct WIICamera final : pt_camera
     void set_fov(double value) override { fov = value; }
     void show_camera_settings() override;
 
+	double get_focal_length() const { return 1.5f; }
+
 private:
 	wiimote * m_pDev;
 	static void on_state_change(wiimote &remote,
