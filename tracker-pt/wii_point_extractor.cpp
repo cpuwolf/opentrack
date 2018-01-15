@@ -37,14 +37,14 @@ using namespace pt_module;
 
 WIIPointExtractor::WIIPointExtractor(const QString& module_name) : s(module_name)
 {
-    blobs.reserve(max_blobs);
+
 }
 
 
 void WIIPointExtractor::extract_points(const pt_frame& frame_, pt_preview& preview_frame_, std::vector<vec2>& points)
 {
     const cv::Mat& frame = frame_.as_const<WIIFrame>()->mat;
-	std::vector<vec2>& pts = frame_.as<WIIFrame>()->points;
+	const std::vector<vec2>& pts = frame_.as_const<WIIFrame>()->points;
 	const vec2* ptds = pts.data();
     cv::Mat& preview_frame = *preview_frame_.as<WIIPreview>();
 	int point_count = points.size();
