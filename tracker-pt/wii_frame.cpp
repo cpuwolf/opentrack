@@ -2,6 +2,7 @@
 * Copyright (c) 2015-2016 Stanislaw Halik <sthalik@misaki.pl>
 * Copyright (c) 2017-2018 Wei Shuai <cpuwolf@gmail.com>
 */
+#include "point_tracker.h"
 #include "wii_frame.hpp"
 
 #include <cstring>

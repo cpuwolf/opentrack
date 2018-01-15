@@ -24,7 +24,8 @@
 
 #include <QString>
 
-#include <cstddef>
+
+
 #include <wiiyourself/wiimote.h>
 
 namespace pt_module {
@@ -43,7 +44,7 @@ struct WIICamera final : pt_camera
     QString get_desired_name() const override;
     QString get_active_name() const override;
 
-    operator bool() const override { return cap && cap->isOpened(); }
+    operator bool() const override { return (m_pDev); }
 
     void set_fov(double value) override { fov = value; }
     void show_camera_settings() override;
