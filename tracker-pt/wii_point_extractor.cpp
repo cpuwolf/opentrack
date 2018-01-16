@@ -41,7 +41,7 @@ WIIPointExtractor::WIIPointExtractor(const QString& module_name) : s(module_name
 }
 
 //define a temp draw function
-void WIIPointExtractor::_draw_point(cv::Mat& preview_frame, const vec2& p, const cv::Scalar& color, int thinkness = 1)
+void WIIPointExtractor::_draw_point(cv::Mat& preview_frame, const vec2& p, const cv::Scalar& color, int thinkness)
 {
 	static constexpr int len = 9;
 
@@ -60,14 +60,14 @@ void WIIPointExtractor::_draw_point(cv::Mat& preview_frame, const vec2& p, const
 		thinkness);
 };
 
-bool WIIPointExtractor::_draw_points(cv::Mat& preview_frame, struct wii_info &wii, std::vector<vec2>& points)
+bool WIIPointExtractor::_draw_points(cv::Mat& preview_frame, const struct wii_info &wii, std::vector<vec2>& points)
 {
 	points.reserve(4);
 	points.clear();
 
 	for (unsigned index = 0; index < 4; index++)
 	{
-		struct wii_info_points &dot = wii.Points[index];
+		const struct wii_info_points &dot = wii.Points[index];
 		if (dot.bvis) {
 			//qDebug() << "wii:" << dot.RawX << "+" << dot.RawY;
 
@@ -88,7 +88,7 @@ bool WIIPointExtractor::_draw_points(cv::Mat& preview_frame, struct wii_info &wi
 	return success;
 }
 
-void WIIPointExtractor::_draw_bg(cv::Mat& preview_frame, struct wii_info &wii)
+void WIIPointExtractor::_draw_bg(cv::Mat& preview_frame, const struct wii_info &wii)
 {
 	//draw battery status
 	cv::line(preview_frame,
@@ -112,7 +112,7 @@ void WIIPointExtractor::_draw_bg(cv::Mat& preview_frame, struct wii_info &wii)
 void WIIPointExtractor::extract_points(const pt_frame& frame_, pt_preview& preview_frame_, std::vector<vec2>& points)
 {
     const cv::Mat& frame = frame_.as_const<WIIFrame>()->mat;
-	struct wii_info& wii = frame_.as<WIIFrame>()->wii;
+	const struct wii_info& wii = frame_.as_const<WIIFrame>()->wii;
     cv::Mat& preview_frame = *preview_frame_.as<WIIPreview>();
 
 	//create a blank frame
