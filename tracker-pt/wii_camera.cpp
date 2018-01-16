@@ -28,7 +28,7 @@ WIICamera::WIICamera(const QString& module_name) : s { module_name }
 	cam_info.fps = 70;
 	cam_info.res_x = 1024;
 	cam_info.res_y = 768;
-	cam_info.fov = 1.2f;
+	cam_info.fov = 42.0f;
 }
 
 QString WIICamera::get_desired_name() const
@@ -89,7 +89,7 @@ pt_camera_open_status WIICamera::start(int idx, int fps, int res_x, int res_y)
 
 void WIICamera::stop()
 {
-	onExit = false;
+	onExit = true;
 	m_pDev->ChangedCallback = NULL;
 	m_pDev->Disconnect();
 	Beep(1000, 200);
