@@ -31,7 +31,9 @@ private:
     static constexpr int max_blobs = 16;
 
     pt_settings s;
-
+	void _draw_point(cv::Mat& preview_frame, const vec2& p, const cv::Scalar& color, int thinkness = 1);
+	bool _draw_points(cv::Mat& preview_frame, struct wii_info &wii, std::vector<vec2>& points);
+	void _draw_bg(cv::Mat& preview_frame, struct wii_info &wii);
 };
 
 } // ns impl

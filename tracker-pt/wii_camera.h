@@ -49,7 +49,6 @@ struct WIICamera final : pt_camera
     void set_fov(double value) override { fov = value; }
     void show_camera_settings() override;
 
-	double get_focal_length() const { return 1.5f; }
 
 private:
 	wiimote * m_pDev;
@@ -57,11 +56,11 @@ private:
 		state_change_flags changed,
 		const wiimote_state &new_state);
 	bool onExit = false;
-	cv::Mat internalframe;
+	pt_frame internalframe;
 	
 	warn_result_unused bool _get_frame(cv::Mat& Frame);
-	bool _get_points(std::vector<vec2>& points);
-	void _draw_bg();
+	bool _get_points(struct wii_info&);
+	void _get_status(struct wii_info&);
 
     double dt_mean = 0, fov = 30;
 

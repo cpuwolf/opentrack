@@ -29,9 +29,6 @@ WIICamera::WIICamera(const QString& module_name) : s { module_name }
 	cam_info.res_x = 1024;
 	cam_info.res_y = 768;
 	cam_info.fov = 1.2f;
-	//create a blank frame
-	internalframe = cv::Mat(cam_info.res_x, cam_info.res_y, CV_8UC3, cv::Scalar(0, 0, 0));
-	//cv::cvtColor(_frame, _frame2, cv::COLOR_BGR2BGRA);
 }
 
 QString WIICamera::get_desired_name() const
@@ -59,16 +56,16 @@ WIICamera::result WIICamera::get_info() const
 WIICamera::result WIICamera::get_frame(pt_frame& frame_)
 {
     cv::Mat& frame = frame_.as<WIIFrame>()->mat;
-	std::vector<vec2>& pts = frame_.as<WIIFrame>()->points;
+	struct wii_info& wii = frame_.as<WIIFrame>()->wii;
 	//create a blank frame
 	cv::Mat blank_frame(cam_info.res_x, cam_info.res_y, CV_8UC3, cv::Scalar(0, 0, 0));
 
     const bool new_frame = _get_frame(frame);
-	const bool new_points = _get_points(pts);
+	const bool new_points = _get_points(wii);
 
     if (new_frame)
     {
-		_draw_bg();
+		_get_status(wii);
         return result(true, cam_info);
     }
     else
@@ -117,15 +114,6 @@ reconnect :
 		if (onExit)
 			goto goodbye;
 		Beep(500, 30); Sleep(1500);
-		//cv::resize(blank_frame, preview_frame, cv::Size(preview_size.width(), preview_size.height()), 0, 0, cv::INTER_NEAREST);
-		//draw wait text
-		cv::putText(internalframe,
-			txtbuf,
-			cv::Point(cam_info.res_x / 10, cam_info.res_y / 2),
-			cv::FONT_HERSHEY_SIMPLEX,
-			1,
-			cv::Scalar(255, 255, 255),
-			1);
 	}
 
 	/* wiimote connected */
@@ -151,59 +139,51 @@ goodbye:
 	return false;
 }
 
-bool WIICamera::_get_points(std::vector<vec2>& points)
+bool WIICamera::_get_points(struct wii_info& wii)
 {
-	points.reserve(4);
-	points.clear();
-
 	bool dot_sizes = (m_pDev->IR.Mode == wiimote_state::ir::EXTENDED);
+	bool ret = false;
 
 	for (unsigned index = 0; index < 4; index++)
 	{
 		wiimote_state::ir::dot &dot = m_pDev->IR.Dot[index];
 		if (dot.bVisible) {
-			//qDebug() << "wii:" << dot.RawX << "+" << dot.RawY;
-
-			const float W = 1024.0f;
-			const float H = 768.0f;
-			const float RX = W - dot.RawX;
-			const float RY = H - dot.RawY;
-			//vec2 dt((dot.RawX - W / 2.0f) / W, -(dot.RawY - H / 2.0f) / W);
-			//anti-clockwise rotate 2D point
-			vec2 dt((RX - W / 2.0f) / W, -(RY - H / 2.0f) / W);
-
-			points.push_back(dt);
-
+			wii.Points[index].ux = dot.RawX;
+			wii.Points[index].uy = dot.RawY;
+			if (dot_sizes) {
+				wii.Points[index].isize = dot.Size;
+			} else {
+				wii.Points[index].isize = 1;
+			}
+			wii.Points[index].bvis = dot.bVisible;
+			ret = true;
+		} else {
+			wii.Points[index].ux = 0;
+			wii.Points[index].uy = 0;
+			wii.Points[index].isize = 0;
+			wii.Points[index].bvis = dot.bVisible;
 		}
 	}
-	const bool success = points.size() >= PointModel::N_POINTS;
-
-	return success;
+	return ret;
 }
 
-void WIICamera::_draw_bg()
+void WIICamera::_get_status(struct wii_info& wii)
 {
 	//draw battery status
-	cv::line(internalframe,
-		cv::Point(0, 0),
-		cv::Point(cam_info.res_x*m_pDev->BatteryPercent / 100, 0),
-		(m_pDev->bBatteryDrained ? cv::Scalar(255, 0, 0) : cv::Scalar(0, 140, 0)),
-		2);
+	wii.BatteryPercent = m_pDev->BatteryPercent;
+	wii.bBatteryDrained = m_pDev->bBatteryDrained;
+
+	//draw horizon
+	static int p = 0;
+	static int r = 0;
+	if (m_pDev->Nunchuk.Acceleration.Orientation.UpdateAge < 10)
 	{
-		//draw horizon
-		static int pdelta = 0;
-		static int rdelta = 0;
-		if (m_pDev->Nunchuk.Acceleration.Orientation.UpdateAge < 10)
-		{
-			pdelta = iround((cam_info.res_y / 2) * tan((m_pDev->Acceleration.Orientation.Pitch)* M_PI / 180.0f));
-			rdelta = iround((cam_info.res_x / 4) * tan((m_pDev->Acceleration.Orientation.Roll)* M_PI / 180.0f));
-		}
-		cv::line(internalframe,
-			cv::Point(0, cam_info.res_y / 2 + rdelta - pdelta),
-			cv::Point(cam_info.res_x, cam_info.res_y / 2 - rdelta - pdelta),
-			cv::Scalar(80, 80, 80),
-			1);
+		p = m_pDev->Acceleration.Orientation.Pitch;
+		r = m_pDev->Acceleration.Orientation.Roll;
 	}
+
+	wii.Pitch = p;
+	wii.Roll = r;
 }
 
 void WIICamera::on_state_change(wiimote &remote,

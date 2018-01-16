@@ -9,12 +9,29 @@
 #include <opencv2/core.hpp>
 #include <QImage>
 
+
+
 namespace pt_module {
+
+struct wii_info_points {
+	unsigned ux;
+	unsigned uy;
+	int isize;
+	bool bvis;
+};
+
+struct wii_info {
+	struct wii_info_points Points[4];
+	bool bBatteryDrained;
+	unsigned char BatteryPercent;
+	float	 Pitch;
+	float	 Roll;
+};
 
 struct WIIFrame final : pt_frame
 {
     cv::Mat mat;
-	std::vector<vec2> points;
+	struct wii_info wii;
 
     operator const cv::Mat&() const& { return mat; }
     operator cv::Mat&() & { return mat; }
