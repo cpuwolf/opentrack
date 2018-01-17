@@ -20,7 +20,6 @@
 #include "cv/video-property-page.hpp"
 
 
-
 using namespace pt_module;
 
 WIICamera::WIICamera(const QString& module_name) : s { module_name }
@@ -57,19 +56,21 @@ WIICamera::result WIICamera::get_frame(pt_frame& frame_)
 {
     cv::Mat& frame = frame_.as<WIIFrame>()->mat;
 	struct wii_info& wii = frame_.as<WIIFrame>()->wii;
-	//create a blank frame
-	cv::Mat blank_frame(cam_info.res_x, cam_info.res_y, CV_8UC3, cv::Scalar(0, 0, 0));
 
-    const bool new_frame = _get_frame(frame);
-	const bool new_points = _get_points(wii);
+    const wii_camera_status new_frame = _get_frame(frame);
+	//create a fake blank frame
+	frame = cv::Mat(cam_info.res_x, cam_info.res_y, CV_8UC3, cv::Scalar(0, 0, 0));
+	wii.status = new_frame;
 
-    if (new_frame)
+    if (new_frame == wii_cam_data_change)
     {
 		_get_status(wii);
-        return result(true, cam_info);
-    }
-    else
-        return result(false, pt_camera_info());
+		const bool new_points = _get_points(wii);
+	}
+
+	return result(true, cam_info);
+    //else
+    //    return result(false, pt_camera_info());
 }
 
 pt_camera_open_status WIICamera::start(int idx, int fps, int res_x, int res_y)
@@ -104,39 +105,33 @@ void WIICamera::stop()
     cam_desired = pt_camera_info();
 }
 
-bool WIICamera::_get_frame(cv::Mat& frame)
+wii_camera_status WIICamera::_get_frame(cv::Mat& frame)
 {
-	char txtbuf[64];
-	sprintf(txtbuf, "%s", "wait for WIImote");
-reconnect :
-	qDebug() << "wii wait";
-	while (!m_pDev->Connect(wiimote::FIRST_AVAILABLE)) {
-		if (onExit)
+	wii_camera_status ret = wii_cam_wait_for_connect;
+
+	if (!m_pDev->IsConnected()) {
+		qDebug() << "wii wait";
+		if (!m_pDev->Connect(wiimote::FIRST_AVAILABLE)) {
+			Beep(500, 30); Sleep(1000);
 			goto goodbye;
-		Beep(500, 30); Sleep(1500);
+		}
 	}
 
-	/* wiimote connected */
-	m_pDev->SetLEDs(0x0f);
-	Beep(1000, 300); Sleep(500);
-
-	qDebug() << "wii connected";
-
-	while (m_pDev->RefreshState() == NO_CHANGE) {
+	if (m_pDev->RefreshState() == NO_CHANGE) {
 		Sleep(1); // don't hog the CPU if nothing changed
-	}
-	if (onExit)
+		ret = wii_cam_data_no_change;
 		goto goodbye;
+	}
 
 	// did we loose the connection?
 	if (m_pDev->ConnectionLost())
 	{
-		goto reconnect;
+		goto goodbye;
 	}
 
-	return true;
+	ret = wii_cam_data_change;
 goodbye:
-	return false;
+	return ret;
 }
 
 bool WIICamera::_get_points(struct wii_info& wii)
@@ -193,6 +188,12 @@ void WIICamera::on_state_change(wiimote &remote,
 	// the wiimote just connected
 	if (changed & CONNECTED)
 	{
+		/* wiimote connected */
+		remote.SetLEDs(0x0f);
+		Beep(1000, 300); Sleep(500);
+
+		qDebug() << "wii connected";
+
 		if (new_state.ExtensionType != wiimote::BALANCE_BOARD)
 		{
 			if (new_state.bExtension)
