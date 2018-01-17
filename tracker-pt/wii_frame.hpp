@@ -13,6 +13,8 @@
 
 namespace pt_module {
 
+enum wii_camera_status : unsigned { wii_cam_wait_for_connect, wii_cam_data_no_change, wii_cam_data_change };
+
 struct wii_info_points {
 	unsigned ux;
 	unsigned uy;
@@ -26,6 +28,7 @@ struct wii_info {
 	unsigned char BatteryPercent;
 	float	 Pitch;
 	float	 Roll;
+	wii_camera_status status;
 };
 
 struct WIIFrame final : pt_frame
