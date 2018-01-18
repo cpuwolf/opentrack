@@ -44,15 +44,15 @@ struct wii_pt_module_traits final : pt_runtime_traits
 
 struct wii_tracker_pt : Tracker_PT
 {
-	wii_tracker_pt() : Tracker_PT(wii_pt_module_traits())
+    wii_tracker_pt() : Tracker_PT(pointer<pt_runtime_traits>(new wii_pt_module_traits))
     {
     }
 };
 
-#if 1
+
 struct wii_dialog_pt : TrackerDialog_PT
 {
-	wii_dialog_pt();
+    wii_dialog_pt();
 };
 
 class wii_metadata_pt : public Metadata
@@ -60,7 +60,7 @@ class wii_metadata_pt : public Metadata
     QString name() { return _("WiiPointTracker 1.1"); }
     QIcon icon() { return QIcon(":/Resources/Logo_IR.png"); }
 };
-#endif
+
 // ns pt_module
 
 using namespace pt_module;

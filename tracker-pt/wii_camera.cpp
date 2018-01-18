@@ -7,7 +7,7 @@
  * copyright notice and this permission notice appear in all copies.
  */
 
-#include "point_tracker.h"
+//#include "point_tracker.h"
 #include "wii_camera.h"
 #include "wii_frame.hpp"
 

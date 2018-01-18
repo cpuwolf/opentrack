@@ -5,8 +5,12 @@ if(OpenCV_FOUND)
     target_include_directories(opentrack-tracker-pt-base SYSTEM PUBLIC ${OpenCV_INCLUDE_DIRS})
 
     set(modules opencv_core opencv_videoio opencv_imgproc)
-	
     otr_module(tracker-pt SOURCES module.cxx)
-    target_link_libraries(opentrack-tracker-pt opentrack-cv opentrack-tracker-wii-pt-wiiyourself ${modules})
+    target_link_libraries(opentrack-tracker-pt opentrack-cv ${modules})
     target_include_directories(opentrack-tracker-pt SYSTEM PUBLIC ${OpenCV_INCLUDE_DIRS})
+
+    set(modules opencv_core opencv_videoio opencv_imgproc)
+    otr_module(tracker-wii-pt SOURCES wii_module.cxx)
+    target_link_libraries(opentrack-tracker-wii-pt opentrack-cv opentrack-tracker-wii-pt-wiiyourself ${modules})
+    target_include_directories(opentrack-tracker-wii-pt SYSTEM PUBLIC ${OpenCV_INCLUDE_DIRS})
 endif()
