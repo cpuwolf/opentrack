@@ -150,7 +150,7 @@ wii_camera_status WIICamera::_pair()
 		}
 		do
 		{
-			if (wcscmp(btdevinfo.szName, L"Nintendo RVL-WBC-01") && wcscmp(btdevinfo.szName, L"Nintendo RVL-CNT-01"))
+			if (wcscmp(btdevinfo.szName, L"Nintendo RVL-CNT-01-TR") && wcscmp(btdevinfo.szName, L"Nintendo RVL-CNT-01"))
 			{
 				continue;
 			}
