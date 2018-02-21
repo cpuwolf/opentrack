@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1">
+<TS version="2.1" language="zh_CN">
 <context>
     <name>UI_new_config</name>
     <message>
@@ -16,7 +16,7 @@
     <name>main_window</name>
     <message>
         <source>Raw tracker data</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">跟踪器原始数据</translation>
     </message>
     <message>
         <source>Z</source>
@@ -44,11 +44,11 @@
     </message>
     <message>
         <source>Game data</source>
-        <translation type="unfinished"></translation>
+        <translation>游戏得到的数据</translation>
     </message>
     <message>
         <source>Profile</source>
-        <translation type="unfinished"></translation>
+        <translation>配置文件</translation>
     </message>
     <message>
         <source>Options</source>
@@ -56,19 +56,19 @@
     </message>
     <message>
         <source>Mapping</source>
-        <translation type="unfinished"></translation>
+        <translation>映射</translation>
     </message>
     <message>
         <source>Tracking</source>
-        <translation type="unfinished"></translation>
+        <translation>跟踪</translation>
     </message>
     <message>
         <source>Start</source>
-        <translation type="unfinished"></translation>
+        <translation>开始</translation>
     </message>
     <message>
         <source>Stop</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">停止</translation>
     </message>
     <message>
         <source>Input</source>
